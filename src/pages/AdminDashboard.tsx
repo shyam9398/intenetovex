@@ -24,13 +24,21 @@ const AdminDashboard: React.FC = () => {
   const [newName, setNewName] = useState("");
   const [newRadius, setNewRadius] = useState(500);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [selectedJunctionForGeofence, setSelectedJunctionForGeofence] = useState<string | null>(null);
 
   const handleMapClick = (latlng: LatLng) => {
     if (!addMode || !newName.trim()) return;
     if (addMode === "junction") addJunction(latlng, newName.trim());
-    else if (addMode === "geofence") addGeofence(latlng, newRadius, newName.trim());
     else if (addMode === "hospital") addHospital(latlng, newName.trim());
     setNewName("");
+    setAddMode(null);
+  };
+
+  const handleAddGeofenceAtJunction = () => {
+    const junction = junctions.find(j => j.id === selectedJunctionForGeofence);
+    if (!junction) return;
+    addGeofence(junction.position, newRadius, `${junction.name} Geofence`);
+    setSelectedJunctionForGeofence(null);
     setAddMode(null);
   };
 
@@ -96,7 +104,7 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
 
-            {addMode && (
+            {addMode && addMode !== "geofence" && (
               <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} className="space-y-2 overflow-hidden">
                 <input
                   value={newName}
@@ -104,23 +112,44 @@ const AdminDashboard: React.FC = () => {
                   placeholder={`${addMode} name...`}
                   className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
                 />
-                {addMode === "geofence" && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground">Radius: {newRadius}m</label>
-                    <input
-                      type="range"
-                      min={100}
-                      max={2000}
-                      step={50}
-                      value={newRadius}
-                      onChange={(e) => setNewRadius(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                  </div>
-                )}
                 <p className="text-[10px] text-muted-foreground">
                   {newName ? "Click on the map to place it" : "Enter a name first"}
                 </p>
+              </motion.div>
+            )}
+
+            {addMode === "geofence" && (
+              <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} className="space-y-2 overflow-hidden">
+                <label className="text-[10px] text-muted-foreground">Select Junction</label>
+                <select
+                  value={selectedJunctionForGeofence ?? ""}
+                  onChange={(e) => setSelectedJunctionForGeofence(e.target.value || null)}
+                  className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
+                >
+                  <option value="">— Choose a junction —</option>
+                  {junctions.map((j) => (
+                    <option key={j.id} value={j.id}>{j.name}</option>
+                  ))}
+                </select>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Radius: {newRadius}m</label>
+                  <input
+                    type="range"
+                    min={100}
+                    max={2000}
+                    step={50}
+                    value={newRadius}
+                    onChange={(e) => setNewRadius(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                </div>
+                <button
+                  onClick={handleAddGeofenceAtJunction}
+                  disabled={!selectedJunctionForGeofence}
+                  className="w-full py-1.5 bg-primary text-primary-foreground font-semibold rounded-md text-xs hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Add Geofence at Junction
+                </button>
               </motion.div>
             )}
           </div>
@@ -258,7 +287,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Map */}
         <main className="flex-1 relative">
-          <MapView onMapClick={addMode ? handleMapClick : undefined} showAmbulances />
+          <MapView onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined} showAmbulances />
           {addMode && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-card border border-primary/30 rounded-lg px-4 py-2 text-xs text-primary font-medium shadow-lg">
               Click on map to add {addMode}: "{newName || "..."}"

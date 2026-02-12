@@ -94,6 +94,23 @@ const DEFAULT_JUNCTIONS: Junction[] = [
   { id: "j1", position: { lat: 12.9716, lng: 77.5946 }, name: "MG Road Junction" },
   { id: "j2", position: { lat: 12.9780, lng: 77.5900 }, name: "Cubbon Park Junction" },
   { id: "j3", position: { lat: 12.9650, lng: 77.6000 }, name: "Richmond Circle" },
+  { id: "j4", position: { lat: 12.9352, lng: 77.6245 }, name: "Silk Board Junction" },
+  { id: "j5", position: { lat: 12.9698, lng: 77.7500 }, name: "Marathahalli Junction" },
+  { id: "j6", position: { lat: 12.9783, lng: 77.6408 }, name: "Indiranagar 100ft Road" },
+  { id: "j7", position: { lat: 12.9563, lng: 77.6010 }, name: "Lalbagh Gate Junction" },
+  { id: "j8", position: { lat: 12.9850, lng: 77.5533 }, name: "Rajajinagar Junction" },
+  { id: "j9", position: { lat: 13.0070, lng: 77.5650 }, name: "Yeshwanthpur Circle" },
+  { id: "j10", position: { lat: 12.9906, lng: 77.5712 }, name: "Majestic Junction" },
+  { id: "j11", position: { lat: 13.0358, lng: 77.5970 }, name: "Hebbal Flyover Junction" },
+  { id: "j12", position: { lat: 12.9121, lng: 77.6446 }, name: "BTM Layout Junction" },
+  { id: "j13", position: { lat: 12.9344, lng: 77.6101 }, name: "Jayanagar 4th Block" },
+  { id: "j14", position: { lat: 12.9540, lng: 77.5730 }, name: "Basavanagudi Circle" },
+  { id: "j15", position: { lat: 12.9260, lng: 77.5830 }, name: "Banashankari Junction" },
+  { id: "j16", position: { lat: 12.9568, lng: 77.7010 }, name: "HSR Layout Junction" },
+  { id: "j17", position: { lat: 12.9165, lng: 77.6101 }, name: "Bommanahalli Junction" },
+  { id: "j18", position: { lat: 13.0200, lng: 77.6440 }, name: "KR Puram Junction" },
+  { id: "j19", position: { lat: 12.9950, lng: 77.6170 }, name: "CV Raman Nagar Junction" },
+  { id: "j20", position: { lat: 12.9450, lng: 77.5620 }, name: "Bull Temple Road Junction" },
 ];
 
 const DEFAULT_HOSPITALS: Hospital[] = [
