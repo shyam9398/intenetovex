@@ -3,9 +3,14 @@ import { useAuth, UserRole } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { Ambulance, ShieldCheck } from "lucide-react";
 
+type AuthMode = "login" | "signup";
+
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
+  const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("driver");
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -34,7 +39,25 @@ const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Mode Tabs */}
+        <div className="flex mb-4 bg-secondary rounded-lg p-1">
+          {(["login", "signup"] as AuthMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
+                mode === m
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m === "login" ? "Sign In" : "Sign Up"}
+            </button>
+          ))}
+        </div>
+
+        {/* Form */}
         <form
           onSubmit={handleSubmit}
           className="bg-card border border-border rounded-xl p-6 space-y-5 shadow-lg"
@@ -52,6 +75,38 @@ const LoginPage: React.FC = () => {
               required
             />
           </div>
+
+          {mode === "signup" && (
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                required
+              />
+            </div>
+          )}
+
+          {mode === "signup" && (
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Create a password"
+                className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                required
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
@@ -84,13 +139,9 @@ const LoginPage: React.FC = () => {
             type="submit"
             className="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors text-sm"
           >
-            Sign In
+            {mode === "login" ? "Sign In" : "Create Account"}
           </button>
         </form>
-
-        <p className="text-center text-[11px] text-muted-foreground mt-4">
-          Prototype — No real authentication
-        </p>
       </motion.div>
     </div>
   );
