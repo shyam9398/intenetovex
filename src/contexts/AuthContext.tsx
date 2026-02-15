@@ -5,12 +5,13 @@ export type UserRole = "admin" | "driver";
 interface AuthUser {
   id: string;
   name: string;
+  email?: string;
   role: UserRole;
 }
 
 interface AuthContextType {
   user: AuthUser | null;
-  login: (name: string, role: UserRole) => void;
+  login: (name: string, role: UserRole, email?: string) => void;
   logout: () => void;
 }
 
@@ -25,8 +26,8 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  const login = useCallback((name: string, role: UserRole) => {
-    setUser({ id: crypto.randomUUID(), name, role });
+  const login = useCallback((name: string, role: UserRole, email?: string) => {
+    setUser({ id: crypto.randomUUID(), name, role, email });
   }, []);
 
   const logout = useCallback(() => setUser(null), []);
