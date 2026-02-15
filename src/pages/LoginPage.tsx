@@ -15,8 +15,16 @@ const LoginPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) login(name.trim(), role);
+    if (role === "admin") {
+      if (email.trim() && password.trim()) {
+        login(name.trim() || email.split("@")[0], role, email.trim());
+      }
+    } else {
+      if (name.trim()) login(name.trim(), role);
+    }
   };
+
+  const isAdminMode = role === "admin";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -62,59 +70,14 @@ const LoginPage: React.FC = () => {
           onSubmit={handleSubmit}
           className="bg-card border border-border rounded-xl p-6 space-y-5 shadow-lg"
         >
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-              Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-              required
-            />
-          </div>
-
-          {mode === "signup" && (
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                required
-              />
-            </div>
-          )}
-
-          {mode === "signup" && (
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
-                className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                required
-              />
-            </div>
-          )}
-
+          {/* Role selector first */}
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
               Role
             </label>
             <div className="grid grid-cols-2 gap-3">
               {([
-                { value: "admin" as UserRole, label: "Admin", icon: ShieldCheck, desc: "System control" },
+                { value: "admin" as UserRole, label: "Admin", icon: ShieldCheck, desc: "Email login" },
                 { value: "driver" as UserRole, label: "Driver", icon: Ambulance, desc: "Field operations" },
               ]).map((r) => (
                 <button
@@ -134,6 +97,101 @@ const LoginPage: React.FC = () => {
               ))}
             </div>
           </div>
+
+          {/* Admin: email + password fields */}
+          {isAdminMode && (
+            <>
+              {(mode === "signup") && (
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          {/* Driver: name field */}
+          {!isAdminMode && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your name"
+                  className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                  required
+                />
+              </div>
+              {mode === "signup" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Create a password"
+                      className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
           <button
             type="submit"

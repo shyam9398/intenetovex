@@ -9,6 +9,7 @@ export interface Junction {
   id: string;
   position: LatLng;
   name: string;
+  signalStatus: "red" | "green";
 }
 
 export interface Geofence {
@@ -91,26 +92,26 @@ function haversineDistance(a: LatLng, b: LatLng): number {
 const DEFAULT_CENTER: LatLng = { lat: 12.9716, lng: 77.5946 }; // Bangalore
 
 const DEFAULT_JUNCTIONS: Junction[] = [
-  { id: "j1", position: { lat: 12.9716, lng: 77.5946 }, name: "MG Road Junction" },
-  { id: "j2", position: { lat: 12.9780, lng: 77.5900 }, name: "Cubbon Park Junction" },
-  { id: "j3", position: { lat: 12.9650, lng: 77.6000 }, name: "Richmond Circle" },
-  { id: "j4", position: { lat: 12.9352, lng: 77.6245 }, name: "Silk Board Junction" },
-  { id: "j5", position: { lat: 12.9698, lng: 77.7500 }, name: "Marathahalli Junction" },
-  { id: "j6", position: { lat: 12.9783, lng: 77.6408 }, name: "Indiranagar 100ft Road" },
-  { id: "j7", position: { lat: 12.9563, lng: 77.6010 }, name: "Lalbagh Gate Junction" },
-  { id: "j8", position: { lat: 12.9850, lng: 77.5533 }, name: "Rajajinagar Junction" },
-  { id: "j9", position: { lat: 13.0070, lng: 77.5650 }, name: "Yeshwanthpur Circle" },
-  { id: "j10", position: { lat: 12.9906, lng: 77.5712 }, name: "Majestic Junction" },
-  { id: "j11", position: { lat: 13.0358, lng: 77.5970 }, name: "Hebbal Flyover Junction" },
-  { id: "j12", position: { lat: 12.9121, lng: 77.6446 }, name: "BTM Layout Junction" },
-  { id: "j13", position: { lat: 12.9344, lng: 77.6101 }, name: "Jayanagar 4th Block" },
-  { id: "j14", position: { lat: 12.9540, lng: 77.5730 }, name: "Basavanagudi Circle" },
-  { id: "j15", position: { lat: 12.9260, lng: 77.5830 }, name: "Banashankari Junction" },
-  { id: "j16", position: { lat: 12.9568, lng: 77.7010 }, name: "HSR Layout Junction" },
-  { id: "j17", position: { lat: 12.9165, lng: 77.6101 }, name: "Bommanahalli Junction" },
-  { id: "j18", position: { lat: 13.0200, lng: 77.6440 }, name: "KR Puram Junction" },
-  { id: "j19", position: { lat: 12.9950, lng: 77.6170 }, name: "CV Raman Nagar Junction" },
-  { id: "j20", position: { lat: 12.9450, lng: 77.5620 }, name: "Bull Temple Road Junction" },
+  { id: "j1", position: { lat: 12.9716, lng: 77.5946 }, name: "MG Road Junction", signalStatus: "green" },
+  { id: "j2", position: { lat: 12.9780, lng: 77.5900 }, name: "Cubbon Park Junction", signalStatus: "green" },
+  { id: "j3", position: { lat: 12.9650, lng: 77.6000 }, name: "Richmond Circle", signalStatus: "green" },
+  { id: "j4", position: { lat: 12.9352, lng: 77.6245 }, name: "Silk Board Junction", signalStatus: "green" },
+  { id: "j5", position: { lat: 12.9698, lng: 77.7500 }, name: "Marathahalli Junction", signalStatus: "green" },
+  { id: "j6", position: { lat: 12.9783, lng: 77.6408 }, name: "Indiranagar 100ft Road", signalStatus: "green" },
+  { id: "j7", position: { lat: 12.9563, lng: 77.6010 }, name: "Lalbagh Gate Junction", signalStatus: "green" },
+  { id: "j8", position: { lat: 12.9850, lng: 77.5533 }, name: "Rajajinagar Junction", signalStatus: "green" },
+  { id: "j9", position: { lat: 13.0070, lng: 77.5650 }, name: "Yeshwanthpur Circle", signalStatus: "green" },
+  { id: "j10", position: { lat: 12.9906, lng: 77.5712 }, name: "Majestic Junction", signalStatus: "green" },
+  { id: "j11", position: { lat: 13.0358, lng: 77.5970 }, name: "Hebbal Flyover Junction", signalStatus: "green" },
+  { id: "j12", position: { lat: 12.9121, lng: 77.6446 }, name: "BTM Layout Junction", signalStatus: "green" },
+  { id: "j13", position: { lat: 12.9344, lng: 77.6101 }, name: "Jayanagar 4th Block", signalStatus: "green" },
+  { id: "j14", position: { lat: 12.9540, lng: 77.5730 }, name: "Basavanagudi Circle", signalStatus: "green" },
+  { id: "j15", position: { lat: 12.9260, lng: 77.5830 }, name: "Banashankari Junction", signalStatus: "green" },
+  { id: "j16", position: { lat: 12.9568, lng: 77.7010 }, name: "HSR Layout Junction", signalStatus: "green" },
+  { id: "j17", position: { lat: 12.9165, lng: 77.6101 }, name: "Bommanahalli Junction", signalStatus: "green" },
+  { id: "j18", position: { lat: 13.0200, lng: 77.6440 }, name: "KR Puram Junction", signalStatus: "green" },
+  { id: "j19", position: { lat: 12.9950, lng: 77.6170 }, name: "CV Raman Nagar Junction", signalStatus: "green" },
+  { id: "j20", position: { lat: 12.9450, lng: 77.5620 }, name: "Bull Temple Road Junction", signalStatus: "green" },
 ];
 
 const DEFAULT_HOSPITALS: Hospital[] = [
@@ -131,7 +132,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const alertedRef = useRef<Set<string>>(new Set());
 
   const addJunction = useCallback((position: LatLng, name: string) => {
-    setJunctions((prev) => [...prev, { id: crypto.randomUUID(), position, name }]);
+    setJunctions((prev) => [...prev, { id: crypto.randomUUID(), position, name, signalStatus: "green" as const }]);
   }, []);
 
   const removeJunction = useCallback((id: string) => {
@@ -219,7 +220,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [ambulances, hospitals]
   );
 
-  // Geofence detection & ETA calculation
+  // Geofence detection, ETA calculation & traffic signal updates
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) => {
@@ -240,7 +241,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   "geofence",
                   amb.id
                 );
-                // Trigger geofence
                 setGeofences((gfs) => gfs.map((g) => (g.id === gf.id ? { ...g, triggered: true } : g)));
               }
               break;
@@ -275,10 +275,25 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         return updated;
       });
+
+      // Update junction signal status based on ambulance proximity
+      setJunctions((prevJunctions) =>
+        prevJunctions.map((j) => {
+          // Check if any active ambulance is within any geofence anchored near this junction
+          const hasNearbyAmbulance = ambulances.some((amb) => {
+            if (!amb.active) return false;
+            // Check if ambulance is within 500m of this junction (signal range)
+            const dist = haversineDistance(amb.position, j.position);
+            return dist <= 800;
+          });
+          const newStatus = hasNearbyAmbulance ? "red" : "green";
+          return j.signalStatus !== newStatus ? { ...j, signalStatus: newStatus } : j;
+        })
+      );
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [geofences, junctions, addAlert]);
+  }, [geofences, junctions, ambulances, addAlert]);
 
   // Simulate ambulance movement
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -23,12 +23,17 @@ const ambulanceIcon = new L.DivIcon({
   iconAnchor: [14, 14],
 });
 
-const junctionIcon = new L.DivIcon({
-  html: `<div style="background:hsl(38,92%,50%);width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:2px solid hsl(0,0%,100%);font-size:10px;">⚡</div>`,
-  className: "",
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
-});
+const createJunctionIcon = (signalStatus: "red" | "green") => {
+  const color = signalStatus === "red" ? "hsl(0,72%,51%)" : "hsl(142,70%,45%)";
+  const glow = signalStatus === "red" ? "rgba(220,38,38,0.6)" : "rgba(34,197,94,0.4)";
+  const emoji = signalStatus === "red" ? "🔴" : "🟢";
+  return new L.DivIcon({
+    html: `<div style="background:${color};width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:2px solid hsl(0,0%,100%);box-shadow:0 0 10px ${glow};font-size:11px;">${emoji}</div>`,
+    className: "",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
 
 const hospitalIcon = new L.DivIcon({
   html: `<div style="background:hsl(142,70%,45%);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid hsl(0,0%,100%);font-size:12px;">🏥</div>`,
@@ -50,11 +55,24 @@ const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onClick }) => {
   return null;
 };
 
+// Component to fly map to a location
+const FlyToLocation: React.FC<{ center: LatLng | null }> = ({ center }) => {
+  const map = useMap();
+  React.useEffect(() => {
+    if (center) {
+      map.flyTo([center.lat, center.lng], 14, { duration: 1 });
+    }
+  }, [center, map]);
+  return null;
+};
+
 interface MapViewProps {
   onMapClick?: (latlng: LatLng) => void;
   showAmbulances?: boolean;
   driverAmbulanceId?: string | null;
   center?: LatLng;
+  searchQuery?: string;
+  flyToCenter?: LatLng | null;
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -62,6 +80,8 @@ const MapView: React.FC<MapViewProps> = ({
   showAmbulances = true,
   driverAmbulanceId,
   center = { lat: 12.9716, lng: 77.5946 },
+  searchQuery = "",
+  flyToCenter = null,
 }) => {
   const { junctions, geofences, hospitals, ambulances } = useAppState();
 
@@ -70,6 +90,12 @@ const MapView: React.FC<MapViewProps> = ({
     : driverAmbulanceId
     ? ambulances.filter((a) => a.id === driverAmbulanceId)
     : [];
+
+  const filteredJunctions = useMemo(() => {
+    if (!searchQuery.trim()) return junctions;
+    const q = searchQuery.toLowerCase();
+    return junctions.filter((j) => j.name.toLowerCase().includes(q));
+  }, [junctions, searchQuery]);
 
   const headingToLabel = (deg: number) => {
     if (deg >= 315 || deg < 45) return "N";
@@ -90,6 +116,7 @@ const MapView: React.FC<MapViewProps> = ({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {onMapClick && <MapClickHandler onClick={onMapClick} />}
+      {flyToCenter && <FlyToLocation center={flyToCenter} />}
 
       {/* Geofences */}
       {geofences.map((gf) => (
@@ -117,13 +144,15 @@ const MapView: React.FC<MapViewProps> = ({
         </Circle>
       ))}
 
-      {/* Junctions */}
-      {junctions.map((j) => (
-        <Marker key={j.id} position={[j.position.lat, j.position.lng]} icon={junctionIcon}>
+      {/* Junctions with traffic signal colors */}
+      {filteredJunctions.map((j) => (
+        <Marker key={j.id} position={[j.position.lat, j.position.lng]} icon={createJunctionIcon(j.signalStatus)}>
           <Popup>
-            <strong>{j.name}</strong>
-            <br />
-            Junction Point
+            <div className="text-sm">
+              <strong>{j.name}</strong>
+              <br />
+              Signal: {j.signalStatus === "red" ? "🔴 RED — Ambulance nearby" : "🟢 GREEN — Clear"}
+            </div>
           </Popup>
         </Marker>
       ))}

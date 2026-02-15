@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppState, type LatLng } from "@/contexts/AppStateContext";
 import MapView from "@/components/MapView";
 import AlertPanel from "@/components/AlertPanel";
 import {
   LogOut, Plus, MapPin, Circle, Building2, Siren,
-  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft,
+  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft, Search,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -25,6 +25,23 @@ const AdminDashboard: React.FC = () => {
   const [newRadius, setNewRadius] = useState(500);
   const [panelOpen, setPanelOpen] = useState(true);
   const [selectedJunctionForGeofence, setSelectedJunctionForGeofence] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [flyToCenter, setFlyToCenter] = useState<LatLng | null>(null);
+
+  const filteredJunctions = useMemo(() => {
+    if (!searchQuery.trim()) return junctions;
+    const q = searchQuery.toLowerCase();
+    return junctions.filter((j) => j.name.toLowerCase().includes(q));
+  }, [junctions, searchQuery]);
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    const q = query.toLowerCase();
+    const matched = junctions.filter((j) => j.name.toLowerCase().includes(q));
+    if (matched.length > 0) {
+      setFlyToCenter({ ...matched[0].position });
+    }
+  };
 
   const handleMapClick = (latlng: LatLng) => {
     if (!addMode || !newName.trim()) return;
@@ -80,6 +97,24 @@ const AdminDashboard: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className="w-80 bg-card border-r border-border flex flex-col overflow-hidden shrink-0">
+          {/* Search */}
+          <div className="p-3 border-b border-border">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search junctions by location..."
+                className="w-full pl-8 pr-3 py-2 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
+              />
+            </div>
+            {searchQuery && (
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                Found {filteredJunctions.length} junction{filteredJunctions.length !== 1 ? "s" : ""} matching "{searchQuery}"
+              </p>
+            )}
+          </div>
+
           {/* Add controls */}
           <div className="p-3 border-b border-border space-y-2">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Add to Map</p>
@@ -211,11 +246,12 @@ const AdminDashboard: React.FC = () => {
             {/* Junctions */}
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
-                Junctions ({junctions.length})
+                Junctions ({filteredJunctions.length}{searchQuery ? ` / ${junctions.length}` : ""})
               </p>
-              {junctions.map((j) => (
+              {filteredJunctions.map((j) => (
                 <div key={j.id} className="flex items-center justify-between py-1 text-xs text-foreground">
                   <span className="flex items-center gap-1.5">
+                    <span className={`w-2.5 h-2.5 rounded-full ${j.signalStatus === "red" ? "bg-destructive animate-pulse" : "bg-green-500"}`} />
                     <MapPin className="w-3 h-3 text-warning" /> {j.name}
                   </span>
                   <button onClick={() => removeJunction(j.id)} className="text-muted-foreground hover:text-destructive">
@@ -287,7 +323,7 @@ const AdminDashboard: React.FC = () => {
 
         {/* Map */}
         <main className="flex-1 relative">
-          <MapView onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined} showAmbulances />
+          <MapView onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined} showAmbulances searchQuery={searchQuery} flyToCenter={flyToCenter} />
           {addMode && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-card border border-primary/30 rounded-lg px-4 py-2 text-xs text-primary font-medium shadow-lg">
               Click on map to add {addMode}: "{newName || "..."}"
