@@ -20,8 +20,7 @@ const DriverDashboard: React.FC = () => {
   useEffect(() => {
     if (!initialized.current && user) {
       initialized.current = true;
-      const id = activateAmbulance(user.name);
-      setAmbulanceId(id);
+      activateAmbulance(user.name).then((id) => setAmbulanceId(id)).catch(console.error);
     }
   }, [user, activateAmbulance]);
 
