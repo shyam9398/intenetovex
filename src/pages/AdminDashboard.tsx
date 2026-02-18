@@ -5,9 +5,9 @@ import MapView from "@/components/MapView";
 import AlertPanel from "@/components/AlertPanel";
 import {
   LogOut, Plus, MapPin, Circle, Building2, Siren,
-  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft, Search,
+  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft, Search, X,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 type AddMode = "junction" | "geofence" | "hospital" | null;
 
@@ -18,6 +18,7 @@ const AdminDashboard: React.FC = () => {
     addJunction, removeJunction,
     addGeofence, removeGeofence, updateGeofenceRadius,
     addHospital, removeHospital,
+    activateAmbulance,
   } = useAppState();
 
   const [addMode, setAddMode] = useState<AddMode>(null);
@@ -27,6 +28,11 @@ const AdminDashboard: React.FC = () => {
   const [selectedJunctionForGeofence, setSelectedJunctionForGeofence] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [flyToCenter, setFlyToCenter] = useState<LatLng | null>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
+
+  // Multi-ambulance spawn
+  const [spawnName, setSpawnName] = useState("");
+  const [spawning, setSpawning] = useState(false);
 
   const filteredJunctions = useMemo(() => {
     if (!searchQuery.trim()) return junctions;
@@ -36,11 +42,12 @@ const AdminDashboard: React.FC = () => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    const q = query.toLowerCase();
-    const matched = junctions.filter((j) => j.name.toLowerCase().includes(q));
-    if (matched.length > 0) {
-      setFlyToCenter({ ...matched[0].position });
-    }
+  };
+
+  const handleSelectSearchResult = (junction: typeof junctions[0]) => {
+    setFlyToCenter({ ...junction.position });
+    setSearchQuery(junction.name);
+    setSearchFocused(false);
   };
 
   const handleMapClick = (latlng: LatLng) => {
@@ -59,6 +66,17 @@ const AdminDashboard: React.FC = () => {
     setAddMode(null);
   };
 
+  const handleSpawnAmbulance = async () => {
+    if (!spawnName.trim()) return;
+    setSpawning(true);
+    try {
+      await activateAmbulance(spawnName.trim());
+      setSpawnName("");
+    } finally {
+      setSpawning(false);
+    }
+  };
+
   const activeAmbulances = ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority);
 
   const headingToLabel = (deg: number) => {
@@ -74,6 +92,8 @@ const AdminDashboard: React.FC = () => {
     if (dir === "straight") return <ArrowUp className="w-3 h-3" />;
     return <span className="text-[10px]">—</span>;
   };
+
+  const showDropdown = searchFocused && searchQuery.trim() && filteredJunctions.length > 0;
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -97,22 +117,92 @@ const AdminDashboard: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className="w-80 bg-card border-r border-border flex flex-col overflow-hidden shrink-0">
-          {/* Search */}
+          {/* Search with junction dropdown */}
           <div className="p-3 border-b border-border">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <input
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                placeholder="Search junctions by location..."
-                className="w-full pl-8 pr-3 py-2 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
-              />
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+                  placeholder="Search location / junction..."
+                  className="w-full pl-8 pr-8 py-2 bg-secondary border border-border rounded-lg text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => { setSearchQuery(""); setSearchFocused(false); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Search results dropdown */}
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="absolute top-full left-0 right-0 z-50 mt-1 bg-card border border-border rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto"
+                  >
+                    <div className="px-2 py-1.5 border-b border-border">
+                      <p className="text-[10px] text-muted-foreground font-medium">
+                        {filteredJunctions.length} junction{filteredJunctions.length !== 1 ? "s" : ""} found
+                      </p>
+                    </div>
+                    {filteredJunctions.map((j) => (
+                      <button
+                        key={j.id}
+                        onMouseDown={() => handleSelectSearchResult(j)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-foreground hover:bg-secondary transition-colors text-left"
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${j.signalStatus === "red" ? "bg-destructive animate-pulse" : "bg-green-500"}`} />
+                        <MapPin className="w-3 h-3 text-warning shrink-0" />
+                        <span className="flex-1 truncate">{j.name}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono">
+                          {j.position.lat.toFixed(3)}, {j.position.lng.toFixed(3)}
+                        </span>
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            {searchQuery && (
+
+            {searchQuery && !showDropdown && (
               <p className="text-[10px] text-muted-foreground mt-1.5">
-                Found {filteredJunctions.length} junction{filteredJunctions.length !== 1 ? "s" : ""} matching "{searchQuery}"
+                {filteredJunctions.length === 0
+                  ? `No junctions match "${searchQuery}"`
+                  : `${filteredJunctions.length} junction${filteredJunctions.length !== 1 ? "s" : ""} matching "${searchQuery}"`}
               </p>
             )}
+          </div>
+
+          {/* Spawn Multiple Ambulances */}
+          <div className="p-3 border-b border-border space-y-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Spawn Ambulance</p>
+            <div className="flex gap-2">
+              <input
+                value={spawnName}
+                onChange={(e) => setSpawnName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSpawnAmbulance()}
+                placeholder="Driver name..."
+                className="flex-1 px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none"
+              />
+              <button
+                onClick={handleSpawnAmbulance}
+                disabled={!spawnName.trim() || spawning}
+                className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-semibold rounded-md hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {spawning ? "..." : "Add"}
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Type a driver name and click Add to spawn a new ambulance on the map</p>
           </div>
 
           {/* Add controls */}
@@ -169,10 +259,7 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <label className="text-[10px] text-muted-foreground">Radius: {newRadius}m</label>
                   <input
-                    type="range"
-                    min={100}
-                    max={2000}
-                    step={50}
+                    type="range" min={100} max={2000} step={50}
                     value={newRadius}
                     onChange={(e) => setNewRadius(Number(e.target.value))}
                     className="w-full accent-primary"
@@ -189,7 +276,7 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Ambulances panel */}
+          {/* Active Ambulances */}
           <div className="border-b border-border">
             <button
               onClick={() => setPanelOpen(!panelOpen)}
@@ -201,7 +288,7 @@ const AdminDashboard: React.FC = () => {
             {panelOpen && (
               <div className="px-3 pb-3 space-y-2 max-h-48 overflow-y-auto">
                 {activeAmbulances.length === 0 ? (
-                  <p className="text-[10px] text-muted-foreground text-center py-3">No active ambulances</p>
+                  <p className="text-[10px] text-muted-foreground text-center py-3">No active ambulances — spawn one above</p>
                 ) : (
                   activeAmbulances.map((amb) => (
                     <div key={amb.id} className="p-2 bg-secondary rounded-lg border border-border space-y-1">
@@ -215,7 +302,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="grid grid-cols-3 gap-1 text-[10px] text-muted-foreground">
                         <div>
-                          <span className="block opacity-60">Approach</span>
+                          <span className="block opacity-60">Dir</span>
                           <span className="text-foreground">{headingToLabel(amb.heading)}</span>
                         </div>
                         <div>
@@ -230,9 +317,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                       </div>
                       {amb.insideGeofenceId && (
-                        <div className="text-[10px] text-primary font-medium animate-pulse-glow">
-                          ⚠ Inside geofence
-                        </div>
+                        <div className="text-[10px] text-primary font-medium animate-pulse">⚠ Inside geofence</div>
                       )}
                     </div>
                   ))
@@ -243,18 +328,22 @@ const AdminDashboard: React.FC = () => {
 
           {/* Items list */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {/* Junctions */}
+            {/* Junctions filtered by search */}
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
                 Junctions ({filteredJunctions.length}{searchQuery ? ` / ${junctions.length}` : ""})
               </p>
               {filteredJunctions.map((j) => (
                 <div key={j.id} className="flex items-center justify-between py-1 text-xs text-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${j.signalStatus === "red" ? "bg-destructive animate-pulse" : "bg-green-500"}`} />
-                    <MapPin className="w-3 h-3 text-warning" /> {j.name}
-                  </span>
-                  <button onClick={() => removeJunction(j.id)} className="text-muted-foreground hover:text-destructive">
+                  <button
+                    onClick={() => setFlyToCenter({ ...j.position })}
+                    className="flex items-center gap-1.5 hover:text-primary transition-colors flex-1 text-left"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${j.signalStatus === "red" ? "bg-destructive animate-pulse" : "bg-green-500"}`} />
+                    <MapPin className="w-3 h-3 text-warning shrink-0" />
+                    <span className="truncate">{j.name}</span>
+                  </button>
+                  <button onClick={() => removeJunction(j.id)} className="text-muted-foreground hover:text-destructive ml-1 shrink-0">
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
@@ -272,7 +361,7 @@ const AdminDashboard: React.FC = () => {
                     <span className="flex items-center gap-1.5">
                       <Circle className={`w-3 h-3 ${g.triggered ? "text-primary" : "text-warning"}`} />
                       {g.name}
-                      {g.triggered && <span className="text-[9px] text-primary animate-pulse-glow">ACTIVE</span>}
+                      {g.triggered && <span className="text-[9px] text-primary animate-pulse">ACTIVE</span>}
                     </span>
                     <button onClick={() => removeGeofence(g.id)} className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="w-3 h-3" />
@@ -280,10 +369,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 pl-5">
                     <input
-                      type="range"
-                      min={100}
-                      max={2000}
-                      step={50}
+                      type="range" min={100} max={2000} step={50}
                       value={g.radius}
                       onChange={(e) => updateGeofenceRadius(g.id, Number(e.target.value))}
                       className="flex-1 accent-primary h-1"
@@ -314,16 +400,19 @@ const AdminDashboard: React.FC = () => {
 
           {/* Alerts */}
           <div className="border-t border-border p-3">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-              Alerts
-            </p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Alerts</p>
             <AlertPanel />
           </div>
         </aside>
 
         {/* Map */}
         <main className="flex-1 relative">
-          <MapView onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined} showAmbulances searchQuery={searchQuery} flyToCenter={flyToCenter} />
+          <MapView
+            onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
+            showAmbulances
+            searchQuery={searchQuery}
+            flyToCenter={flyToCenter}
+          />
           {addMode && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-card border border-primary/30 rounded-lg px-4 py-2 text-xs text-primary font-medium shadow-lg">
               Click on map to add {addMode}: "{newName || "..."}"

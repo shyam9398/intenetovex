@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./AuthContext";
 
 export interface LatLng {
   lat: number;
@@ -15,7 +17,7 @@ export interface Junction {
 export interface Geofence {
   id: string;
   center: LatLng;
-  radius: number; // meters
+  radius: number;
   name: string;
   triggered: boolean;
 }
@@ -32,11 +34,11 @@ export interface Ambulance {
   id: string;
   driverName: string;
   position: LatLng;
-  speed: number; // km/h
-  heading: number; // degrees
+  speed: number;
+  heading: number;
   exitDirection: ExitDirection;
   insideGeofenceId: string | null;
-  eta: number | null; // seconds
+  eta: number | null;
   priority: number;
   active: boolean;
 }
@@ -55,16 +57,16 @@ interface AppStateContextType {
   hospitals: Hospital[];
   ambulances: Ambulance[];
   alerts: Alert[];
-  addJunction: (position: LatLng, name: string) => void;
-  removeJunction: (id: string) => void;
-  addGeofence: (center: LatLng, radius: number, name: string) => void;
-  removeGeofence: (id: string) => void;
-  updateGeofenceRadius: (id: string, radius: number) => void;
-  addHospital: (position: LatLng, name: string) => void;
-  removeHospital: (id: string) => void;
-  activateAmbulance: (driverName: string) => string;
+  addJunction: (position: LatLng, name: string) => Promise<void>;
+  removeJunction: (id: string) => Promise<void>;
+  addGeofence: (center: LatLng, radius: number, name: string) => Promise<void>;
+  removeGeofence: (id: string) => Promise<void>;
+  updateGeofenceRadius: (id: string, radius: number) => Promise<void>;
+  addHospital: (position: LatLng, name: string) => Promise<void>;
+  removeHospital: (id: string) => Promise<void>;
+  activateAmbulance: (driverName: string) => Promise<string>;
   updateAmbulancePosition: (id: string, position: LatLng, heading: number) => void;
-  setAmbulanceExitDirection: (id: string, dir: ExitDirection) => void;
+  setAmbulanceExitDirection: (id: string, dir: ExitDirection) => Promise<void>;
   addAlert: (message: string, type: Alert["type"], ambulanceId?: string) => void;
   dismissAlert: (id: string) => void;
   recommendedHospital: (ambulanceId: string) => Hospital | null;
@@ -78,7 +80,7 @@ export const useAppState = () => {
   return ctx;
 };
 
-function haversineDistance(a: LatLng, b: LatLng): number {
+export function haversineDistance(a: LatLng, b: LatLng): number {
   const R = 6371000;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
   const dLng = ((b.lng - a.lng) * Math.PI) / 180;
@@ -88,77 +90,102 @@ function haversineDistance(a: LatLng, b: LatLng): number {
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 
-// Default data for demo
-const DEFAULT_CENTER: LatLng = { lat: 12.9716, lng: 77.5946 }; // Bangalore
-
-const DEFAULT_JUNCTIONS: Junction[] = [
-  { id: "j1", position: { lat: 12.9716, lng: 77.5946 }, name: "MG Road Junction", signalStatus: "green" },
-  { id: "j2", position: { lat: 12.9780, lng: 77.5900 }, name: "Cubbon Park Junction", signalStatus: "green" },
-  { id: "j3", position: { lat: 12.9650, lng: 77.6000 }, name: "Richmond Circle", signalStatus: "green" },
-  { id: "j4", position: { lat: 12.9352, lng: 77.6245 }, name: "Silk Board Junction", signalStatus: "green" },
-  { id: "j5", position: { lat: 12.9698, lng: 77.7500 }, name: "Marathahalli Junction", signalStatus: "green" },
-  { id: "j6", position: { lat: 12.9783, lng: 77.6408 }, name: "Indiranagar 100ft Road", signalStatus: "green" },
-  { id: "j7", position: { lat: 12.9563, lng: 77.6010 }, name: "Lalbagh Gate Junction", signalStatus: "green" },
-  { id: "j8", position: { lat: 12.9850, lng: 77.5533 }, name: "Rajajinagar Junction", signalStatus: "green" },
-  { id: "j9", position: { lat: 13.0070, lng: 77.5650 }, name: "Yeshwanthpur Circle", signalStatus: "green" },
-  { id: "j10", position: { lat: 12.9906, lng: 77.5712 }, name: "Majestic Junction", signalStatus: "green" },
-  { id: "j11", position: { lat: 13.0358, lng: 77.5970 }, name: "Hebbal Flyover Junction", signalStatus: "green" },
-  { id: "j12", position: { lat: 12.9121, lng: 77.6446 }, name: "BTM Layout Junction", signalStatus: "green" },
-  { id: "j13", position: { lat: 12.9344, lng: 77.6101 }, name: "Jayanagar 4th Block", signalStatus: "green" },
-  { id: "j14", position: { lat: 12.9540, lng: 77.5730 }, name: "Basavanagudi Circle", signalStatus: "green" },
-  { id: "j15", position: { lat: 12.9260, lng: 77.5830 }, name: "Banashankari Junction", signalStatus: "green" },
-  { id: "j16", position: { lat: 12.9568, lng: 77.7010 }, name: "HSR Layout Junction", signalStatus: "green" },
-  { id: "j17", position: { lat: 12.9165, lng: 77.6101 }, name: "Bommanahalli Junction", signalStatus: "green" },
-  { id: "j18", position: { lat: 13.0200, lng: 77.6440 }, name: "KR Puram Junction", signalStatus: "green" },
-  { id: "j19", position: { lat: 12.9950, lng: 77.6170 }, name: "CV Raman Nagar Junction", signalStatus: "green" },
-  { id: "j20", position: { lat: 12.9450, lng: 77.5620 }, name: "Bull Temple Road Junction", signalStatus: "green" },
-];
-
-const DEFAULT_HOSPITALS: Hospital[] = [
-  { id: "h1", position: { lat: 12.9600, lng: 77.5850 }, name: "City General Hospital" },
-  { id: "h2", position: { lat: 12.9800, lng: 77.6050 }, name: "Metro Emergency Center" },
-];
-
-const DEFAULT_GEOFENCES: Geofence[] = [
-  { id: "g1", center: { lat: 12.9716, lng: 77.5946 }, radius: 500, name: "MG Road Zone", triggered: false },
-];
-
 export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [junctions, setJunctions] = useState<Junction[]>(DEFAULT_JUNCTIONS);
-  const [geofences, setGeofences] = useState<Geofence[]>(DEFAULT_GEOFENCES);
-  const [hospitals, setHospitals] = useState<Hospital[]>(DEFAULT_HOSPITALS);
+  const { user, session } = useAuth();
+  const [junctions, setJunctions] = useState<Junction[]>([]);
+  const [geofences, setGeofences] = useState<Geofence[]>([]);
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [ambulances, setAmbulances] = useState<Ambulance[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const alertedRef = useRef<Set<string>>(new Set());
+  const myAmbulanceId = useRef<string | null>(null);
 
-  const addJunction = useCallback((position: LatLng, name: string) => {
-    setJunctions((prev) => [...prev, { id: crypto.randomUUID(), position, name, signalStatus: "green" as const }]);
+  // ── Loaders ──────────────────────────────────────────────────────────
+  const loadJunctions = useCallback(async () => {
+    const { data } = await supabase.from("junctions").select("*").order("name");
+    if (data) {
+      setJunctions(data.map((j) => ({
+        id: j.id,
+        position: { lat: j.lat, lng: j.lng },
+        name: j.name,
+        signalStatus: j.signal_status as "red" | "green",
+      })));
+    }
   }, []);
 
-  const removeJunction = useCallback((id: string) => {
-    setJunctions((prev) => prev.filter((j) => j.id !== id));
+  const loadGeofences = useCallback(async () => {
+    const { data } = await supabase.from("geofences").select("*");
+    if (data) {
+      setGeofences(data.map((g) => ({
+        id: g.id,
+        center: { lat: g.center_lat, lng: g.center_lng },
+        radius: g.radius,
+        name: g.name,
+        triggered: g.triggered,
+      })));
+    }
   }, []);
 
-  const addGeofence = useCallback((center: LatLng, radius: number, name: string) => {
-    setGeofences((prev) => [...prev, { id: crypto.randomUUID(), center, radius, name, triggered: false }]);
+  const loadHospitals = useCallback(async () => {
+    const { data } = await supabase.from("hospitals").select("*");
+    if (data) {
+      setHospitals(data.map((h) => ({
+        id: h.id,
+        position: { lat: h.lat, lng: h.lng },
+        name: h.name,
+      })));
+    }
   }, []);
 
-  const removeGeofence = useCallback((id: string) => {
-    setGeofences((prev) => prev.filter((g) => g.id !== id));
+  const loadAmbulances = useCallback(async () => {
+    const { data } = await supabase.from("ambulances").select("*").eq("active", true);
+    if (data) {
+      setAmbulances(data.map(dbToAmb));
+    }
   }, []);
 
-  const updateGeofenceRadius = useCallback((id: string, radius: number) => {
-    setGeofences((prev) => prev.map((g) => (g.id === id ? { ...g, radius } : g)));
-  }, []);
+  // ── Initial load ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!session) return;
+    loadJunctions();
+    loadGeofences();
+    loadHospitals();
+    loadAmbulances();
+  }, [session, loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
 
-  const addHospital = useCallback((position: LatLng, name: string) => {
-    setHospitals((prev) => [...prev, { id: crypto.randomUUID(), position, name }]);
-  }, []);
+  // ── Realtime subscriptions ────────────────────────────────────────────
+  useEffect(() => {
+    if (!session) return;
 
-  const removeHospital = useCallback((id: string) => {
-    setHospitals((prev) => prev.filter((h) => h.id !== id));
-  }, []);
+    const ambChannel = supabase
+      .channel("ambulances-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ambulances" }, () => {
+        loadAmbulances();
+      })
+      .subscribe();
 
+    const junctionChannel = supabase
+      .channel("junctions-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "junctions" }, () => {
+        loadJunctions();
+      })
+      .subscribe();
+
+    const geofenceChannel = supabase
+      .channel("geofences-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "geofences" }, () => {
+        loadGeofences();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ambChannel);
+      supabase.removeChannel(junctionChannel);
+      supabase.removeChannel(geofenceChannel);
+    };
+  }, [session, loadAmbulances, loadJunctions, loadGeofences]);
+
+  // ── Helpers ───────────────────────────────────────────────────────────
   const addAlert = useCallback((message: string, type: Alert["type"], ambulanceId?: string) => {
     setAlerts((prev) => [
       { id: crypto.randomUUID(), message, type, timestamp: new Date(), ambulanceId },
@@ -170,36 +197,70 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  const activateAmbulance = useCallback((driverName: string): string => {
-    const id = crypto.randomUUID();
-    // Start near a random junction
-    const startJunction = DEFAULT_JUNCTIONS[Math.floor(Math.random() * DEFAULT_JUNCTIONS.length)];
-    const offset = { lat: (Math.random() - 0.5) * 0.01, lng: (Math.random() - 0.5) * 0.01 };
-    setAmbulances((prev) => [
-      ...prev,
-      {
-        id,
-        driverName,
-        position: { lat: startJunction.position.lat + offset.lat, lng: startJunction.position.lng + offset.lng },
-        speed: 40 + Math.random() * 40,
-        heading: Math.random() * 360,
-        exitDirection: null,
-        insideGeofenceId: null,
-        eta: null,
-        priority: 0,
-        active: true,
-      },
-    ]);
-    addAlert(`Ambulance ${driverName} is now active`, "info", id);
-    return id;
-  }, [addAlert]);
-
-  const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number) => {
-    setAmbulances((prev) => prev.map((a) => (a.id === id ? { ...a, position, heading } : a)));
+  // ── CRUD ─────────────────────────────────────────────────────────────
+  const addJunction = useCallback(async (position: LatLng, name: string) => {
+    await supabase.from("junctions").insert({ name, lat: position.lat, lng: position.lng });
   }, []);
 
-  const setAmbulanceExitDirection = useCallback((id: string, dir: ExitDirection) => {
+  const removeJunction = useCallback(async (id: string) => {
+    await supabase.from("junctions").delete().eq("id", id);
+  }, []);
+
+  const addGeofence = useCallback(async (center: LatLng, radius: number, name: string) => {
+    await supabase.from("geofences").insert({ name, center_lat: center.lat, center_lng: center.lng, radius });
+  }, []);
+
+  const removeGeofence = useCallback(async (id: string) => {
+    await supabase.from("geofences").delete().eq("id", id);
+  }, []);
+
+  const updateGeofenceRadius = useCallback(async (id: string, radius: number) => {
+    await supabase.from("geofences").update({ radius }).eq("id", id);
+    // Optimistic local update for slider smoothness
+    setGeofences((prev) => prev.map((g) => (g.id === id ? { ...g, radius } : g)));
+  }, []);
+
+  const addHospital = useCallback(async (position: LatLng, name: string) => {
+    await supabase.from("hospitals").insert({ name, lat: position.lat, lng: position.lng });
+  }, []);
+
+  const removeHospital = useCallback(async (id: string) => {
+    await supabase.from("hospitals").delete().eq("id", id);
+  }, []);
+
+  const activateAmbulance = useCallback(async (driverName: string): Promise<string> => {
+    if (!user) throw new Error("Not authenticated");
+    const startJunction = junctions[Math.floor(Math.random() * Math.max(junctions.length, 1))];
+    const startPos = startJunction
+      ? { lat: startJunction.position.lat + (Math.random() - 0.5) * 0.01, lng: startJunction.position.lng + (Math.random() - 0.5) * 0.01 }
+      : { lat: 12.9716 + (Math.random() - 0.5) * 0.01, lng: 77.5946 + (Math.random() - 0.5) * 0.01 };
+
+    const { data, error } = await supabase.from("ambulances").insert({
+      driver_id: user.id,
+      driver_name: driverName,
+      lat: startPos.lat,
+      lng: startPos.lng,
+      speed: 40 + Math.random() * 40,
+      heading: Math.random() * 360,
+      active: true,
+    }).select().single();
+
+    if (error || !data) throw new Error("Failed to activate ambulance");
+    myAmbulanceId.current = data.id;
+    addAlert(`🚑 Ambulance ${driverName} is now active`, "info", data.id);
+    return data.id;
+  }, [user, junctions, addAlert]);
+
+  const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number) => {
+    // Optimistic local update for smooth movement
+    setAmbulances((prev) => prev.map((a) => (a.id === id ? { ...a, position, heading } : a)));
+    // Persist to DB (fire-and-forget)
+    supabase.from("ambulances").update({ lat: position.lat, lng: position.lng, heading }).eq("id", id);
+  }, []);
+
+  const setAmbulanceExitDirection = useCallback(async (id: string, dir: ExitDirection) => {
     setAmbulances((prev) => prev.map((a) => (a.id === id ? { ...a, exitDirection: dir } : a)));
+    await supabase.from("ambulances").update({ exit_direction: dir }).eq("id", id);
   }, []);
 
   const recommendedHospital = useCallback(
@@ -210,24 +271,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       let minDist = Infinity;
       for (const h of hospitals) {
         const d = haversineDistance(amb.position, h.position);
-        if (d < minDist) {
-          minDist = d;
-          closest = h;
-        }
+        if (d < minDist) { minDist = d; closest = h; }
       }
       return closest;
     },
     [ambulances, hospitals]
   );
 
-  // Geofence detection, ETA calculation & traffic signal updates
+  // ── Geofence detection, ETA & signal updates ──────────────────────────
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) => {
         const updated = prev.map((amb) => {
           if (!amb.active) return amb;
 
-          // Check geofences
           let insideId: string | null = null;
           for (const gf of geofences) {
             const dist = haversineDistance(amb.position, gf.center);
@@ -236,92 +293,71 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               const key = `${amb.id}-${gf.id}`;
               if (!alertedRef.current.has(key)) {
                 alertedRef.current.add(key);
-                addAlert(
-                  `🚨 Ambulance ${amb.driverName} entered Geofence "${gf.name}" — Prepare clearance`,
-                  "geofence",
-                  amb.id
-                );
+                addAlert(`🚨 ${amb.driverName} entered "${gf.name}" — Prepare clearance`, "geofence", amb.id);
+                supabase.from("geofences").update({ triggered: true }).eq("id", gf.id);
                 setGeofences((gfs) => gfs.map((g) => (g.id === gf.id ? { ...g, triggered: true } : g)));
               }
               break;
             }
           }
 
-          // Reset triggered if left
           if (!insideId && amb.insideGeofenceId) {
             const key = `${amb.id}-${amb.insideGeofenceId}`;
             alertedRef.current.delete(key);
+            supabase.from("geofences").update({ triggered: false }).eq("id", amb.insideGeofenceId);
             setGeofences((gfs) => gfs.map((g) => (g.id === amb.insideGeofenceId ? { ...g, triggered: false } : g)));
           }
 
-          // Calculate ETA to nearest junction
           let minEta: number | null = null;
           for (const j of junctions) {
             const dist = haversineDistance(amb.position, j.position);
-            const etaSeconds = (dist / ((amb.speed * 1000) / 3600));
-            if (minEta === null || etaSeconds < minEta) {
-              minEta = etaSeconds;
-            }
+            const etaSeconds = dist / ((amb.speed * 1000) / 3600);
+            if (minEta === null || etaSeconds < minEta) minEta = etaSeconds;
           }
 
           return { ...amb, insideGeofenceId: insideId, eta: minEta };
         });
 
-        // Priority ranking
         const active = updated.filter((a) => a.active && a.eta !== null).sort((a, b) => (a.eta ?? Infinity) - (b.eta ?? Infinity));
-        active.forEach((a, i) => {
-          a.priority = i + 1;
-        });
-
+        active.forEach((a, i) => { a.priority = i + 1; });
         return updated;
       });
 
-      // Update junction signal status based on ambulance proximity
+      // Junction signal updates
       setJunctions((prevJunctions) =>
         prevJunctions.map((j) => {
-          // Check if any active ambulance is within any geofence anchored near this junction
-          const hasNearbyAmbulance = ambulances.some((amb) => {
-            if (!amb.active) return false;
-            // Check if ambulance is within 500m of this junction (signal range)
-            const dist = haversineDistance(amb.position, j.position);
-            return dist <= 800;
-          });
-          const newStatus = hasNearbyAmbulance ? "red" : "green";
-          return j.signalStatus !== newStatus ? { ...j, signalStatus: newStatus } : j;
+          const hasNearby = ambulances.some((amb) => amb.active && haversineDistance(amb.position, j.position) <= 800);
+          const newStatus = hasNearby ? "red" : "green";
+          if (j.signalStatus !== newStatus) {
+            supabase.from("junctions").update({ signal_status: newStatus }).eq("id", j.id);
+            return { ...j, signalStatus: newStatus };
+          }
+          return j;
         })
       );
     }, 1000);
-
     return () => clearInterval(interval);
   }, [geofences, junctions, ambulances, addAlert]);
 
-  // Simulate ambulance movement
+  // ── Simulate ambulance movement (local only for smooth animation) ──────
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) =>
         prev.map((amb) => {
           if (!amb.active) return amb;
           const speedMs = (amb.speed * 1000) / 3600;
-          const dt = 1;
           const rad = (amb.heading * Math.PI) / 180;
-          const dLat = (speedMs * dt * Math.cos(rad)) / 111320;
-          const dLng = (speedMs * dt * Math.sin(rad)) / (111320 * Math.cos((amb.position.lat * Math.PI) / 180));
-
-          // Slight random heading drift
+          const dLat = (speedMs * Math.cos(rad)) / 111320;
+          const dLng = (speedMs * Math.sin(rad)) / (111320 * Math.cos((amb.position.lat * Math.PI) / 180));
           const newHeading = amb.heading + (Math.random() - 0.5) * 10;
-
           return {
             ...amb,
-            position: {
-              lat: amb.position.lat + dLat,
-              lng: amb.position.lng + dLng,
-            },
+            position: { lat: amb.position.lat + dLat, lng: amb.position.lng + dLng },
             heading: newHeading % 360,
           };
         })
       );
     }, 1000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -340,3 +376,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     </AppStateContext.Provider>
   );
 };
+
+// ── DB row → Ambulance ────────────────────────────────────────────────
+function dbToAmb(row: any): Ambulance {
+  return {
+    id: row.id,
+    driverName: row.driver_name,
+    position: { lat: row.lat, lng: row.lng },
+    speed: row.speed,
+    heading: row.heading,
+    exitDirection: row.exit_direction as ExitDirection,
+    insideGeofenceId: row.inside_geofence_id,
+    eta: row.eta,
+    priority: row.priority,
+    active: row.active,
+  };
+}
