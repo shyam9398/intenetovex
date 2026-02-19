@@ -1,15 +1,18 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppState, type LatLng } from "@/contexts/AppStateContext";
 import MapView from "@/components/MapView";
 import AlertPanel from "@/components/AlertPanel";
 import {
   LogOut, Plus, MapPin, Circle, Building2, Siren,
-  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft, Search, X,
+  ChevronDown, ChevronUp, Trash2, ArrowUp, ArrowRight, ArrowLeft, Search, X, Box, Map,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const JunctionScene3D = lazy(() => import("@/components/JunctionScene3D"));
+
 type AddMode = "junction" | "geofence" | "hospital" | null;
+type ViewMode = "map" | "3d";
 
 const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -25,6 +28,7 @@ const AdminDashboard: React.FC = () => {
   const [newName, setNewName] = useState("");
   const [newRadius, setNewRadius] = useState(500);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("map");
   const [selectedJunctionForGeofence, setSelectedJunctionForGeofence] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [flyToCenter, setFlyToCenter] = useState<LatLng | null>(null);
@@ -405,17 +409,78 @@ const AdminDashboard: React.FC = () => {
           </div>
         </aside>
 
-        {/* Map */}
-        <main className="flex-1 relative">
-          <MapView
-            onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
-            showAmbulances
-            searchQuery={searchQuery}
-            flyToCenter={flyToCenter}
-          />
-          {addMode && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-card border border-primary/30 rounded-lg px-4 py-2 text-xs text-primary font-medium shadow-lg">
-              Click on map to add {addMode}: "{newName || "..."}"
+        {/* Main view area */}
+        <main className="flex-1 relative flex flex-col overflow-hidden">
+          {/* View toggle tab bar */}
+          <div className="flex items-center gap-1 px-3 py-2 bg-card border-b border-border shrink-0">
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === "map"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              }`}
+            >
+              <Map className="w-3.5 h-3.5" />
+              Map View
+            </button>
+            <button
+              onClick={() => setViewMode("3d")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                viewMode === "3d"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              3D Junction
+            </button>
+            {viewMode === "3d" && (
+              <span className="ml-2 text-[10px] text-muted-foreground">
+                Top-down smart junction — live ambulance positions &amp; signal states
+              </span>
+            )}
+          </div>
+
+          {/* Map */}
+          {viewMode === "map" && (
+            <div className="flex-1 relative">
+              <MapView
+                onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
+                showAmbulances
+                searchQuery={searchQuery}
+                flyToCenter={flyToCenter}
+              />
+              {addMode && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-card border border-primary/30 rounded-lg px-4 py-2 text-xs text-primary font-medium shadow-lg">
+                  Click on map to add {addMode}: "{newName || "..."}"
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3D Junction View */}
+          {viewMode === "3d" && (
+            <div className="flex-1 relative">
+              <Suspense
+                fallback={
+                  <div className="w-full h-full flex items-center justify-center bg-background">
+                    <div className="text-xs text-muted-foreground animate-pulse">Loading 3D scene…</div>
+                  </div>
+                }
+              >
+                <JunctionScene3D className="w-full h-full" />
+              </Suspense>
+
+              {/* Legend overlay */}
+              <div className="absolute bottom-3 left-3 bg-card/90 border border-border rounded-lg p-2.5 text-[10px] text-muted-foreground space-y-1 backdrop-blur-sm">
+                <p className="text-foreground font-semibold mb-1">Legend</p>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" />Signal RED — ambulance nearby</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />Signal GREEN — clear</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-warning inline-block" />Geofence boundary</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-foreground inline-block" />Ambulance unit</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-success inline-block" />Exit path / arrow</div>
+              </div>
             </div>
           )}
         </main>
