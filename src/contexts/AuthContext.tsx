@@ -36,14 +36,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUserProfile = async (supaUser: User) => {
     try {
       const [profileRes, roleRes] = await Promise.all([
-        supabase.from("profiles").select("name").eq("user_id", supaUser.id).single(),
-        supabase.from("user_roles").select("role").eq("user_id", supaUser.id).single(),
+        supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", supaUser.id).maybeSingle(),
       ]);
       const name = profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User";
       const role = (roleRes.data?.role as UserRole) ?? "driver";
       setUser({ id: supaUser.id, name, email: supaUser.email, role });
-    } catch {
-      setUser(null);
+    } catch (err) {
+      console.error("Failed to load user profile:", err);
+      // Still set a basic user so the app doesn't hang
+      const fallbackName = supaUser.email?.split("@")[0] ?? "User";
+      setUser({ id: supaUser.id, name: fallbackName, email: supaUser.email, role: "driver" });
     }
   };
 
