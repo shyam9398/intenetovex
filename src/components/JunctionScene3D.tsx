@@ -2,21 +2,37 @@ import React, { useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
-import { useAppState } from "@/contexts/AppStateContext";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const JUNCTION_RADIUS = 2.2; // geofence radius in scene units
+const JUNCTION_RADIUS = 2.2;
 const ROAD_WIDTH = 1.0;
 const ROAD_LENGTH = 6;
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+export interface JunctionSceneProps {
+  className?: string;
+  junctionName?: string;
+  signalRed?: boolean;
+  geofenceTriggered?: boolean;
+  ambulances?: {
+    id: string;
+    driverName: string;
+    heading: number;
+    exitDirection: string | null;
+    insideGeofenceId: string | null;
+    priority: number;
+    speed: number;
+    eta: number | null;
+  }[];
+}
+
 // ── Road ─────────────────────────────────────────────────────────────────────
-const Road: React.FC<{ rotation?: [number, number, number]; highlighted?: boolean; isExit?: boolean }> = ({
+const Road: React.FC<{ rotation?: [number, number, number]; isActive?: boolean }> = ({
   rotation = [0, 0, 0],
-  highlighted = false,
-  isExit = false,
+  isActive = false,
 }) => {
-  const color = isExit ? "#22c55e" : highlighted ? "#ef4444" : "#2a2f3a";
-  const emissive = isExit ? "#14532d" : highlighted ? "#7f1d1d" : "#111827";
+  const color = isActive ? "#22c55e" : "#2a2f3a";
+  const emissive = isActive ? "#14532d" : "#111827";
 
   return (
     <mesh rotation={rotation as any} receiveShadow={false}>
@@ -24,7 +40,7 @@ const Road: React.FC<{ rotation?: [number, number, number]; highlighted?: boolea
       <meshStandardMaterial
         color={color}
         emissive={emissive}
-        emissiveIntensity={highlighted || isExit ? 0.6 : 0.1}
+        emissiveIntensity={isActive ? 0.6 : 0.1}
         roughness={0.9}
         metalness={0}
       />
@@ -83,7 +99,6 @@ const Ground: React.FC = () => (
 const ExitArrow: React.FC<{ direction: string | null }> = ({ direction }) => {
   if (!direction) return null;
 
-  // Map exit direction to rotation in Y (top-down) and offset
   const rotMap: Record<string, number> = {
     straight: 0,
     left: -Math.PI / 2,
@@ -100,12 +115,10 @@ const ExitArrow: React.FC<{ direction: string | null }> = ({ direction }) => {
 
   return (
     <group position={pos as any} rotation={[0, rot, 0]}>
-      {/* Arrow shaft */}
       <mesh position={[0, 0, 0.2]}>
         <boxGeometry args={[0.15, 0.06, 0.6]} />
         <meshStandardMaterial color="#22c55e" emissive="#14532d" emissiveIntensity={0.8} />
       </mesh>
-      {/* Arrow head */}
       <mesh position={[0, 0, -0.1]} rotation={[0, 0, 0]}>
         <coneGeometry args={[0.25, 0.4, 8]} />
         <meshStandardMaterial color="#22c55e" emissive="#14532d" emissiveIntensity={0.8} />
@@ -140,7 +153,6 @@ const Ambulance3D: React.FC<AmbulanceProps> = ({
 
   return (
     <group position={[x, 0.1, z]}>
-      {/* Body */}
       <mesh ref={bodyRef} position={[0, 0.18, 0]}>
         <boxGeometry args={[0.38, 0.28, 0.6]} />
         <meshStandardMaterial
@@ -151,13 +163,11 @@ const Ambulance3D: React.FC<AmbulanceProps> = ({
           metalness={0.2}
         />
       </mesh>
-      {/* Roof (red cross) */}
       <mesh position={[0, 0.35, 0]}>
         <boxGeometry args={[0.36, 0.06, 0.58]} />
         <meshStandardMaterial color="#dc2626" emissive="#7f1d1d" emissiveIntensity={0.5} />
       </mesh>
 
-      {/* Priority label floating above */}
       <Html position={[0, 0.85, 0]} center>
         <div
           style={{
@@ -179,7 +189,6 @@ const Ambulance3D: React.FC<AmbulanceProps> = ({
         </div>
       </Html>
 
-      {/* In-geofence alert badge */}
       {insideGeofence && (
         <Html position={[0, 1.2, 0]} center>
           <div
@@ -193,7 +202,6 @@ const Ambulance3D: React.FC<AmbulanceProps> = ({
               borderRadius: "3px",
               whiteSpace: "nowrap",
               pointerEvents: "none",
-              animation: "none",
             }}
           >
             ⚠ GEOFENCE
@@ -205,24 +213,22 @@ const Ambulance3D: React.FC<AmbulanceProps> = ({
 };
 
 // ── Scene ─────────────────────────────────────────────────────────────────────
-const JunctionScene: React.FC = () => {
-  const { ambulances, junctions, geofences } = useAppState();
-
+const JunctionScene: React.FC<{
+  signalRed: boolean;
+  geofenceTriggered: boolean;
+  ambulances: JunctionSceneProps["ambulances"];
+  junctionName?: string;
+}> = ({ signalRed, geofenceTriggered, ambulances = [], junctionName }) => {
   const activeAmbs = useMemo(
-    () => ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority),
+    () => [...ambulances].sort((a, b) => a.priority - b.priority),
     [ambulances]
   );
-
-  // Use the first junction with a geofence as the "focus" junction
-  const focusGeofence = geofences[0] ?? null;
-  const signalRed = junctions.some((j) => j.signalStatus === "red");
-  const geofenceTriggered = focusGeofence?.triggered ?? false;
 
   // Determine exit direction from highest-priority ambulance inside geofence
   const insideAmb = activeAmbs.find((a) => a.insideGeofenceId);
   const exitDir = insideAmb?.exitDirection ?? null;
 
-  // Approach road highlight: which road is the ambulance approaching from?
+  // Approach road: which direction is the ambulance coming from?
   const approachRoad = useMemo(() => {
     if (!insideAmb) return null;
     const h = insideAmb.heading % 360;
@@ -232,7 +238,32 @@ const JunctionScene: React.FC = () => {
     return "west";
   }, [insideAmb]);
 
-  // Place ambulances in a circle around junction at scenic positions
+  // Determine which roads should be green (approach + exit)
+  const nsActive = useMemo(() => {
+    if (!approachRoad) return false;
+    // N-S road is active if approach is from north/south
+    const approachOnNS = approachRoad === "north" || approachRoad === "south";
+    // Or if exit goes straight on the same axis
+    const exitOnNS = exitDir === "straight" && approachOnNS;
+    // Or if exit is left/right and that maps to N-S
+    // If approaching from east/west, left/right exits go to N-S
+    const exitTurnsToNS =
+      (approachRoad === "east" || approachRoad === "west") &&
+      (exitDir === "left" || exitDir === "right");
+    return approachOnNS || exitOnNS || exitTurnsToNS;
+  }, [approachRoad, exitDir]);
+
+  const ewActive = useMemo(() => {
+    if (!approachRoad) return false;
+    const approachOnEW = approachRoad === "east" || approachRoad === "west";
+    const exitOnEW = exitDir === "straight" && approachOnEW;
+    const exitTurnsToEW =
+      (approachRoad === "north" || approachRoad === "south") &&
+      (exitDir === "left" || exitDir === "right");
+    return approachOnEW || exitOnEW || exitTurnsToEW;
+  }, [approachRoad, exitDir]);
+
+  // Place ambulances in a circle around junction
   const placedAmbs = useMemo(() => {
     return activeAmbs.map((amb, i) => {
       const angle = (i / Math.max(activeAmbs.length, 1)) * Math.PI * 2;
@@ -243,26 +274,15 @@ const JunctionScene: React.FC = () => {
 
   return (
     <>
-      {/* Lights — no shadows, minimal */}
       <ambientLight intensity={0.55} color="#c8d0e0" />
       <directionalLight position={[5, 8, 5]} intensity={0.7} color="#e0e8ff" castShadow={false} />
       <pointLight position={[0, 3, 0]} intensity={0.3} color="#ffffff" distance={12} />
 
       <Ground />
 
-      {/* Roads — 4-way cross */}
-      {/* N-S road */}
-      <Road
-        rotation={[0, 0, 0]}
-        highlighted={approachRoad === "north" || approachRoad === "south"}
-        isExit={exitDir === "straight" && (approachRoad === "north" || approachRoad === "south")}
-      />
-      {/* E-W road */}
-      <Road
-        rotation={[0, Math.PI / 2, 0]}
-        highlighted={approachRoad === "east" || approachRoad === "west"}
-        isExit={exitDir === "straight" && (approachRoad === "east" || approachRoad === "west")}
-      />
+      {/* 4-way cross roads */}
+      <Road rotation={[0, 0, 0]} isActive={nsActive} />
+      <Road rotation={[0, Math.PI / 2, 0]} isActive={ewActive} />
 
       <JunctionCenter signalRed={signalRed} />
       <GeofenceRing triggered={geofenceTriggered} />
@@ -282,7 +302,7 @@ const JunctionScene: React.FC = () => {
         </mesh>
       ))}
 
-      {/* Signal poles at corners */}
+      {/* Signal poles */}
       {[[0.8, 0.8], [-0.8, 0.8], [0.8, -0.8], [-0.8, -0.8]].map(([px, pz], i) => (
         <group key={i} position={[px, 0, pz]}>
           <mesh position={[0, 0.4, 0]}>
@@ -300,6 +320,28 @@ const JunctionScene: React.FC = () => {
         </group>
       ))}
 
+      {/* Junction name label */}
+      {junctionName && (
+        <Html position={[0, 0.3, ROAD_LENGTH / 2 + 1]} center>
+          <div
+            style={{
+              background: "hsl(220,16%,14%)",
+              color: "hsl(215,20%,75%)",
+              fontSize: "12px",
+              fontWeight: 700,
+              fontFamily: "Inter, sans-serif",
+              padding: "3px 10px",
+              borderRadius: "6px",
+              border: "1px solid rgba(255,255,255,0.1)",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+            }}
+          >
+            {junctionName}
+          </div>
+        </Html>
+      )}
+
       {/* Ambulances */}
       {placedAmbs.map((amb) => (
         <Ambulance3D
@@ -314,7 +356,6 @@ const JunctionScene: React.FC = () => {
         />
       ))}
 
-      {/* No ambulances hint */}
       {activeAmbs.length === 0 && (
         <Html center position={[0, 0.5, 0]}>
           <div style={{
@@ -333,7 +374,13 @@ const JunctionScene: React.FC = () => {
 };
 
 // ── Exported wrapper ─────────────────────────────────────────────────────────
-const JunctionScene3D: React.FC<{ className?: string }> = ({ className }) => {
+const JunctionScene3D: React.FC<JunctionSceneProps> = ({
+  className,
+  junctionName,
+  signalRed = false,
+  geofenceTriggered = false,
+  ambulances = [],
+}) => {
   return (
     <div className={className} style={{ background: "hsl(220,20%,8%)" }}>
       <Canvas
@@ -342,7 +389,12 @@ const JunctionScene3D: React.FC<{ className?: string }> = ({ className }) => {
         dpr={[1, 1.5]}
         frameloop="always"
       >
-        <JunctionScene />
+        <JunctionScene
+          signalRed={signalRed}
+          geofenceTriggered={geofenceTriggered}
+          ambulances={ambulances}
+          junctionName={junctionName}
+        />
       </Canvas>
     </div>
   );
