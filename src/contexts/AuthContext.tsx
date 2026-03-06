@@ -35,37 +35,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadUserProfile = async (supaUser: User) => {
     try {
-      const [profileRes, roleRes] = await Promise.all([
+      const [profileRes, rolesRes] = await Promise.all([
         supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", supaUser.id).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", supaUser.id),
       ]);
+
+      if (profileRes.error) {
+        console.warn("Profile load warning:", profileRes.error.message);
+      }
+      if (rolesRes.error) {
+        console.warn("Role load warning:", rolesRes.error.message);
+      }
+
       const name = profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User";
-      const role = (roleRes.data?.role as UserRole) ?? "driver";
+      const roles = (rolesRes.data ?? []).map((r) => r.role as UserRole);
+      const role: UserRole = roles.includes("admin") ? "admin" : "driver";
+
       setUser({ id: supaUser.id, name, email: supaUser.email, role });
     } catch (err) {
       console.error("Failed to load user profile:", err);
-      // Still set a basic user so the app doesn't hang
       const fallbackName = supaUser.email?.split("@")[0] ?? "User";
       setUser({ id: supaUser.id, name: fallbackName, email: supaUser.email, role: "driver" });
     }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session?.user) {
-        await loadUserProfile(session.user);
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!isMounted) return;
+
+        setSession(session);
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Auth initialization failed:", error);
+        if (isMounted) setUser(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession?.user) {
+        await loadUserProfile(nextSession.user);
       } else {
         setUser(null);
       }
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) setLoading(false);
-    });
+    void initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signup = useCallback(async (
