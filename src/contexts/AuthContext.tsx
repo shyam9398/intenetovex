@@ -85,6 +85,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (profileError || roleError) {
       return { error: profileError?.message ?? roleError?.message ?? "Failed to save profile" };
     }
+
+    // Reload profile now that role is inserted (fixes race condition with onAuthStateChange)
+    if (data.user) {
+      await loadUserProfile(data.user);
+    }
+
     return { error: null };
   }, []);
 
