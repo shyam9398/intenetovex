@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [loadUserProfile]);
 
   const signup = useCallback(async (
     email: string, password: string, role: UserRole, name: string
