@@ -33,12 +33,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUserProfile = async (supaUser: User) => {
+  const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 5000): Promise<T> => {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Profile loading timed out")), timeoutMs);
+      }),
+    ]);
+  }, []);
+
+  const loadUserProfile = useCallback(async (supaUser: User) => {
     try {
-      const [profileRes, rolesRes] = await Promise.all([
+      const [profileRes, rolesRes] = await withTimeout(Promise.all([
         supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", supaUser.id),
-      ]);
+      ]), 5000);
 
       if (profileRes.error) {
         console.warn("Profile load warning:", profileRes.error.message);
@@ -57,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const fallbackName = supaUser.email?.split("@")[0] ?? "User";
       setUser({ id: supaUser.id, name: fallbackName, email: supaUser.email, role: "driver" });
     }
-  };
+  }, [withTimeout]);
 
   useEffect(() => {
     let isMounted = true;
