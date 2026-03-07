@@ -509,6 +509,7 @@ const AdminDashboard: React.FC = () => {
               <div className="flex-1 relative">
                 <MapView
                   onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
+                  onJunctionClick={handleJunctionClick}
                   showAmbulances
                   searchQuery={searchQuery}
                   flyToCenter={flyToCenter}
