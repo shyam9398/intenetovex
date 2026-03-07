@@ -91,13 +91,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      setSession(nextSession);
-      if (nextSession?.user) {
-        await loadUserProfile(nextSession.user);
-      } else {
-        setUser(null);
+      try {
+        setSession(nextSession);
+        if (nextSession?.user) {
+          await loadUserProfile(nextSession.user);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Auth state change handling failed:", error);
+        if (!nextSession?.user) setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     void initializeAuth();
