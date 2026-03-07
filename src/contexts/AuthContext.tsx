@@ -138,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return { error: null };
-  }, []);
+  }, [loadUserProfile]);
 
   const login = useCallback(async (
     email: string, password: string, _role: UserRole, _name?: string
