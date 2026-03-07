@@ -68,6 +68,7 @@ const FlyToLocation: React.FC<{ center: LatLng | null }> = ({ center }) => {
 
 interface MapViewProps {
   onMapClick?: (latlng: LatLng) => void;
+  onJunctionClick?: (junctionId: string) => void;
   showAmbulances?: boolean;
   driverAmbulanceId?: string | null;
   center?: LatLng;
@@ -77,6 +78,7 @@ interface MapViewProps {
 
 const MapView: React.FC<MapViewProps> = ({
   onMapClick,
+  onJunctionClick,
   showAmbulances = true,
   driverAmbulanceId,
   center = { lat: 12.9716, lng: 77.5946 },
@@ -152,6 +154,28 @@ const MapView: React.FC<MapViewProps> = ({
               <strong>{j.name}</strong>
               <br />
               Signal: {j.signalStatus === "red" ? "🔴 RED — Ambulance nearby" : "🟢 GREEN — Clear"}
+              {onJunctionClick && (
+                <>
+                  <br />
+                  <button
+                    onClick={() => onJunctionClick(j.id)}
+                    style={{
+                      marginTop: "6px",
+                      padding: "4px 10px",
+                      background: "hsl(221,83%,53%)",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      width: "100%",
+                    }}
+                  >
+                    🔲 View 3D Map
+                  </button>
+                </>
+              )}
             </div>
           </Popup>
         </Marker>
