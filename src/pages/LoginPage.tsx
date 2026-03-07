@@ -29,10 +29,8 @@ const LoginPage: React.FC = () => {
       const { error } = await signup(email.trim(), password, role, name.trim());
       if (error) {
         setError(error);
-      } else {
-        setInfo("Account created! Please check your email to confirm, then sign in.");
-        setMode("login");
       }
+      // Auto-confirm is enabled, so auth state change will auto-redirect
     } else {
       if (!email.trim()) { setError("Email is required"); setLoading(false); return; }
       if (!password) { setError("Password is required"); setLoading(false); return; }
