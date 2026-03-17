@@ -100,133 +100,74 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const alertedRef = useRef<Set<string>>(new Set());
   const myAmbulanceId = useRef<string | null>(null);
 
-  // ── Loaders ──────────────────────────────────────────────────────────
+  // ── Loaders ──
   const loadJunctions = useCallback(async () => {
     const { data } = await supabase.from("junctions").select("*").order("name");
-    if (data) {
-      setJunctions(data.map((j) => ({
-        id: j.id,
-        position: { lat: j.lat, lng: j.lng },
-        name: j.name,
-        signalStatus: j.signal_status as "red" | "green",
-      })));
-    }
+    if (data) setJunctions(data.map((j) => ({ id: j.id, position: { lat: j.lat, lng: j.lng }, name: j.name, signalStatus: j.signal_status as "red" | "green" })));
   }, []);
 
   const loadGeofences = useCallback(async () => {
     const { data } = await supabase.from("geofences").select("*");
-    if (data) {
-      setGeofences(data.map((g) => ({
-        id: g.id,
-        center: { lat: g.center_lat, lng: g.center_lng },
-        radius: g.radius,
-        name: g.name,
-        triggered: g.triggered,
-      })));
-    }
+    if (data) setGeofences(data.map((g) => ({ id: g.id, center: { lat: g.center_lat, lng: g.center_lng }, radius: g.radius, name: g.name, triggered: g.triggered })));
   }, []);
 
   const loadHospitals = useCallback(async () => {
     const { data } = await supabase.from("hospitals").select("*");
-    if (data) {
-      setHospitals(data.map((h) => ({
-        id: h.id,
-        position: { lat: h.lat, lng: h.lng },
-        name: h.name,
-      })));
-    }
+    if (data) setHospitals(data.map((h) => ({ id: h.id, position: { lat: h.lat, lng: h.lng }, name: h.name })));
   }, []);
 
   const loadAmbulances = useCallback(async () => {
     const { data } = await supabase.from("ambulances").select("*").eq("active", true);
-    if (data) {
-      setAmbulances(data.map(dbToAmb));
-    }
+    if (data) setAmbulances(data.map(dbToAmb));
   }, []);
 
-  // ── Initial load ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
-    loadJunctions();
-    loadGeofences();
-    loadHospitals();
-    loadAmbulances();
+    loadJunctions(); loadGeofences(); loadHospitals(); loadAmbulances();
   }, [session, loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
 
-  // ── Realtime subscriptions ────────────────────────────────────────────
+  // ── Realtime ──
   useEffect(() => {
     if (!session) return;
-
-    const ambChannel = supabase
-      .channel("ambulances-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ambulances" }, () => {
-        loadAmbulances();
-      })
-      .subscribe();
-
-    const junctionChannel = supabase
-      .channel("junctions-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "junctions" }, () => {
-        loadJunctions();
-      })
-      .subscribe();
-
-    const geofenceChannel = supabase
-      .channel("geofences-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "geofences" }, () => {
-        loadGeofences();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(ambChannel);
-      supabase.removeChannel(junctionChannel);
-      supabase.removeChannel(geofenceChannel);
-    };
+    const ambCh = supabase.channel("ambulances-rt").on("postgres_changes", { event: "*", schema: "public", table: "ambulances" }, () => loadAmbulances()).subscribe();
+    const jCh = supabase.channel("junctions-rt").on("postgres_changes", { event: "*", schema: "public", table: "junctions" }, () => loadJunctions()).subscribe();
+    const gCh = supabase.channel("geofences-rt").on("postgres_changes", { event: "*", schema: "public", table: "geofences" }, () => loadGeofences()).subscribe();
+    return () => { supabase.removeChannel(ambCh); supabase.removeChannel(jCh); supabase.removeChannel(gCh); };
   }, [session, loadAmbulances, loadJunctions, loadGeofences]);
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+  // ── Helpers ──
   const addAlert = useCallback((message: string, type: Alert["type"], ambulanceId?: string) => {
-    setAlerts((prev) => [
-      { id: crypto.randomUUID(), message, type, timestamp: new Date(), ambulanceId },
-      ...prev,
-    ].slice(0, 50));
+    setAlerts((prev) => [{ id: crypto.randomUUID(), message, type, timestamp: new Date(), ambulanceId }, ...prev].slice(0, 50));
   }, []);
 
   const dismissAlert = useCallback((id: string) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  // ── CRUD ─────────────────────────────────────────────────────────────
+  // Clear alerts for a specific ambulance
+  const clearAlertsForAmbulance = useCallback((ambulanceId: string) => {
+    setAlerts((prev) => prev.filter((a) => a.ambulanceId !== ambulanceId));
+  }, []);
+
+  // ── CRUD ──
   const addJunction = useCallback(async (position: LatLng, name: string) => {
     await supabase.from("junctions").insert({ name, lat: position.lat, lng: position.lng });
   }, []);
-
-  const removeJunction = useCallback(async (id: string) => {
-    await supabase.from("junctions").delete().eq("id", id);
-  }, []);
+  const removeJunction = useCallback(async (id: string) => { await supabase.from("junctions").delete().eq("id", id); }, []);
 
   const addGeofence = useCallback(async (center: LatLng, radius: number, name: string) => {
     await supabase.from("geofences").insert({ name, center_lat: center.lat, center_lng: center.lng, radius });
   }, []);
-
-  const removeGeofence = useCallback(async (id: string) => {
-    await supabase.from("geofences").delete().eq("id", id);
-  }, []);
-
+  const removeGeofence = useCallback(async (id: string) => { await supabase.from("geofences").delete().eq("id", id); }, []);
   const updateGeofenceRadius = useCallback(async (id: string, radius: number) => {
     await supabase.from("geofences").update({ radius }).eq("id", id);
-    // Optimistic local update for slider smoothness
     setGeofences((prev) => prev.map((g) => (g.id === id ? { ...g, radius } : g)));
   }, []);
 
   const addHospital = useCallback(async (position: LatLng, name: string) => {
     await supabase.from("hospitals").insert({ name, lat: position.lat, lng: position.lng });
   }, []);
-
-  const removeHospital = useCallback(async (id: string) => {
-    await supabase.from("hospitals").delete().eq("id", id);
-  }, []);
+  const removeHospital = useCallback(async (id: string) => { await supabase.from("hospitals").delete().eq("id", id); }, []);
 
   const activateAmbulance = useCallback(async (driverName: string): Promise<string> => {
     if (!user) throw new Error("Not authenticated");
@@ -236,25 +177,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       : { lat: 12.9716 + (Math.random() - 0.5) * 0.01, lng: 77.5946 + (Math.random() - 0.5) * 0.01 };
 
     const { data, error } = await supabase.from("ambulances").insert({
-      driver_id: user.id,
-      driver_name: driverName,
-      lat: startPos.lat,
-      lng: startPos.lng,
-      speed: 40 + Math.random() * 40,
-      heading: Math.random() * 360,
-      active: true,
+      driver_id: user.id, driver_name: driverName,
+      lat: startPos.lat, lng: startPos.lng,
+      speed: 40 + Math.random() * 40, heading: Math.random() * 360, active: true,
     }).select().single();
 
     if (error || !data) throw new Error("Failed to activate ambulance");
     myAmbulanceId.current = data.id;
-    addAlert(`🚑 Ambulance ${driverName} is now active`, "info", data.id);
+    addAlert(`🚑 ${driverName} is now active`, "info", data.id);
     return data.id;
   }, [user, junctions, addAlert]);
 
   const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number) => {
-    // Optimistic local update for smooth movement
     setAmbulances((prev) => prev.map((a) => (a.id === id ? { ...a, position, heading } : a)));
-    // Persist to DB (fire-and-forget)
     supabase.from("ambulances").update({ lat: position.lat, lng: position.lng, heading }).eq("id", id);
   }, []);
 
@@ -263,28 +198,24 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await supabase.from("ambulances").update({ exit_direction: dir }).eq("id", id);
   }, []);
 
-  const recommendedHospital = useCallback(
-    (ambulanceId: string): Hospital | null => {
-      const amb = ambulances.find((a) => a.id === ambulanceId);
-      if (!amb || hospitals.length === 0) return null;
-      let closest: Hospital | null = null;
-      let minDist = Infinity;
-      for (const h of hospitals) {
-        const d = haversineDistance(amb.position, h.position);
-        if (d < minDist) { minDist = d; closest = h; }
-      }
-      return closest;
-    },
-    [ambulances, hospitals]
-  );
+  const recommendedHospital = useCallback((ambulanceId: string): Hospital | null => {
+    const amb = ambulances.find((a) => a.id === ambulanceId);
+    if (!amb || hospitals.length === 0) return null;
+    let closest: Hospital | null = null;
+    let minDist = Infinity;
+    for (const h of hospitals) {
+      const d = haversineDistance(amb.position, h.position);
+      if (d < minDist) { minDist = d; closest = h; }
+    }
+    return closest;
+  }, [ambulances, hospitals]);
 
-  // ── Geofence detection, ETA & signal updates ──────────────────────────
+  // ── Geofence detection, ETA, signals, auto-clear ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) => {
         const updated = prev.map((amb) => {
           if (!amb.active) return amb;
-
           let insideId: string | null = null;
           for (const gf of geofences) {
             const dist = haversineDistance(amb.position, gf.center);
@@ -293,7 +224,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               const key = `${amb.id}-${gf.id}`;
               if (!alertedRef.current.has(key)) {
                 alertedRef.current.add(key);
-                addAlert(`🚨 ${amb.driverName} entered "${gf.name}" — Prepare clearance`, "geofence", amb.id);
+                addAlert(`🚨 ${amb.driverName} entered "${gf.name}"`, "geofence", amb.id);
                 supabase.from("geofences").update({ triggered: true }).eq("id", gf.id);
                 setGeofences((gfs) => gfs.map((g) => (g.id === gf.id ? { ...g, triggered: true } : g)));
               }
@@ -301,11 +232,15 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
 
+          // Auto-clear on exit
           if (!insideId && amb.insideGeofenceId) {
             const key = `${amb.id}-${amb.insideGeofenceId}`;
             alertedRef.current.delete(key);
+            clearAlertsForAmbulance(amb.id);
             supabase.from("geofences").update({ triggered: false }).eq("id", amb.insideGeofenceId);
             setGeofences((gfs) => gfs.map((g) => (g.id === amb.insideGeofenceId ? { ...g, triggered: false } : g)));
+            // Reset exit direction on exit
+            supabase.from("ambulances").update({ exit_direction: null }).eq("id", amb.id);
           }
 
           let minEta: number | null = null;
@@ -315,7 +250,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             if (minEta === null || etaSeconds < minEta) minEta = etaSeconds;
           }
 
-          return { ...amb, insideGeofenceId: insideId, eta: minEta };
+          return {
+            ...amb,
+            insideGeofenceId: insideId,
+            eta: minEta,
+            // Clear exit direction when leaving geofence
+            exitDirection: !insideId && amb.insideGeofenceId ? null : amb.exitDirection,
+          };
         });
 
         const active = updated.filter((a) => a.active && a.eta !== null).sort((a, b) => (a.eta ?? Infinity) - (b.eta ?? Infinity));
@@ -324,8 +265,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       // Junction signal updates
-      setJunctions((prevJunctions) =>
-        prevJunctions.map((j) => {
+      setJunctions((prevJ) =>
+        prevJ.map((j) => {
           const hasNearby = ambulances.some((amb) => amb.active && haversineDistance(amb.position, j.position) <= 800);
           const newStatus = hasNearby ? "red" : "green";
           if (j.signalStatus !== newStatus) {
@@ -337,9 +278,9 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
     }, 1000);
     return () => clearInterval(interval);
-  }, [geofences, junctions, ambulances, addAlert]);
+  }, [geofences, junctions, ambulances, addAlert, clearAlertsForAmbulance]);
 
-  // ── Simulate ambulance movement (local only for smooth animation) ──────
+  // ── Simulate ambulance movement ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) =>
@@ -350,11 +291,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const dLat = (speedMs * Math.cos(rad)) / 111320;
           const dLng = (speedMs * Math.sin(rad)) / (111320 * Math.cos((amb.position.lat * Math.PI) / 180));
           const newHeading = amb.heading + (Math.random() - 0.5) * 10;
-          return {
-            ...amb,
-            position: { lat: amb.position.lat + dLat, lng: amb.position.lng + dLng },
-            heading: newHeading % 360,
-          };
+          return { ...amb, position: { lat: amb.position.lat + dLat, lng: amb.position.lng + dLng }, heading: newHeading % 360 };
         })
       );
     }, 1000);
@@ -362,33 +299,21 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   return (
-    <AppStateContext.Provider
-      value={{
-        junctions, geofences, hospitals, ambulances, alerts,
-        addJunction, removeJunction,
-        addGeofence, removeGeofence, updateGeofenceRadius,
-        addHospital, removeHospital,
-        activateAmbulance, updateAmbulancePosition, setAmbulanceExitDirection,
-        addAlert, dismissAlert, recommendedHospital,
-      }}
-    >
+    <AppStateContext.Provider value={{
+      junctions, geofences, hospitals, ambulances, alerts,
+      addJunction, removeJunction, addGeofence, removeGeofence, updateGeofenceRadius,
+      addHospital, removeHospital, activateAmbulance, updateAmbulancePosition, setAmbulanceExitDirection,
+      addAlert, dismissAlert, recommendedHospital,
+    }}>
       {children}
     </AppStateContext.Provider>
   );
 };
 
-// ── DB row → Ambulance ────────────────────────────────────────────────
 function dbToAmb(row: any): Ambulance {
   return {
-    id: row.id,
-    driverName: row.driver_name,
-    position: { lat: row.lat, lng: row.lng },
-    speed: row.speed,
-    heading: row.heading,
-    exitDirection: row.exit_direction as ExitDirection,
-    insideGeofenceId: row.inside_geofence_id,
-    eta: row.eta,
-    priority: row.priority,
-    active: row.active,
+    id: row.id, driverName: row.driver_name, position: { lat: row.lat, lng: row.lng },
+    speed: row.speed, heading: row.heading, exitDirection: row.exit_direction as ExitDirection,
+    insideGeofenceId: row.inside_geofence_id, eta: row.eta, priority: row.priority, active: row.active,
   };
 }
