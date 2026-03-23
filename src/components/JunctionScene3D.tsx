@@ -152,7 +152,7 @@ const LShapedPath: React.FC<{ approach: string; exit: string | null }> = ({ appr
       {/* Arrow at exit end */}
       <mesh position={[exitPos[0], 0.12, exitPos[1]]} rotation={[0, Math.atan2(exitPos[0], exitPos[1]), 0]}>
         <coneGeometry args={[0.2, 0.35, 8]} />
-        <meshStandardMaterial color="#22c55e" emissive="#14532d" emissiveIntensity={0.8} />
+        <meshStandardMaterial color="#3b82f6" emissive="#1e3a5f" emissiveIntensity={0.8} />
       </mesh>
     </group>
   );
