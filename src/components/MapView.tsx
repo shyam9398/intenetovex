@@ -180,6 +180,7 @@ const MapView = forwardRef<HTMLDivElement, MapViewProps>(({
                   </>
                 )}
               </div>
+            </Popup>
           </Marker>
         ))}
 
