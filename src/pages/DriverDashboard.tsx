@@ -39,13 +39,32 @@ const DriverDashboard: React.FC = () => {
   const lastGoodPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastSentTime = useRef(0);
   const lastHeadingRef = useRef(0);
+  const gpsOverrodeCity = useRef(false);
 
   useEffect(() => {
     if (!initialized.current && user) {
       initialized.current = true;
-      activateAmbulance(user.name).then((id) => setAmbulanceId(id)).catch(console.error);
+      const cityPos = (() => {
+        try {
+          const raw = sessionStorage.getItem("driver_initial_position");
+          if (raw) return JSON.parse(raw) as { lat: number; lng: number };
+        } catch {}
+        return null;
+      })();
+
+      if (cityPos) {
+        setMapCenter(cityPos);
+        setFlyTo(cityPos);
+      }
+
+      activateAmbulance(user.name).then((id) => {
+        setAmbulanceId(id);
+        if (cityPos) {
+          updateAmbulancePosition(id, cityPos, 0, 0);
+        }
+      }).catch(console.error);
     }
-  }, [user, activateAmbulance]);
+  }, [user, activateAmbulance, updateAmbulancePosition]);
 
   const myAmbulance = ambulances.find((a) => a.id === ambulanceId);
   const recHospital = ambulanceId ? recommendedHospital(ambulanceId) : null;
@@ -81,6 +100,7 @@ const DriverDashboard: React.FC = () => {
 
     lastGoodPos.current = nextPosition;
     lastHeadingRef.current = heading;
+    gpsOverrodeCity.current = true;
     setGpsStatus("tracking");
     setGpsMessage(`GPS locked • accuracy ${Math.round(position.coords.accuracy)}m • live tracking`);
     setMapCenter(nextPosition);
