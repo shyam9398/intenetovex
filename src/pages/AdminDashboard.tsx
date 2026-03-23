@@ -422,7 +422,7 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-foreground font-semibold mb-1">Legend</p>
                 <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-destructive inline-block" />Signal RED</div>
                 <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-success inline-block" />Signal GREEN</div>
-                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-success inline-block" />Approach/Exit road</div>
+                <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />Approach/Exit path</div>
                 <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-warning inline-block" />Geofence boundary</div>
               </div>
             </div>
