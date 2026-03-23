@@ -143,7 +143,7 @@ const LShapedPath: React.FC<{ approach: string; exit: string | null }> = ({ appr
           <mesh key={i} position={[cx, 0.08, cz]} rotation={[0, angle, 0]}>
             <boxGeometry args={[0.3, 0.04, length]} />
             <meshStandardMaterial
-              color="#22c55e" emissive="#14532d" emissiveIntensity={0.8}
+              color="#3b82f6" emissive="#1e3a5f" emissiveIntensity={0.8}
               transparent opacity={0.85}
             />
           </mesh>
