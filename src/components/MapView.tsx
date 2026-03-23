@@ -181,6 +181,26 @@ const MapView = forwardRef<HTMLDivElement, MapViewProps>(({
                 )}
               </div>
             </Popup>
+            {onJunctionClick && (
+              <Tooltip direction="right" offset={[14, 0]} permanent interactive>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onJunctionClick(junction.id); }}
+                  style={{
+                    padding: "2px 6px",
+                    background: "hsl(221,83%,53%)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  3D
+                </button>
+              </Tooltip>
+            )}
           </Marker>
         ))}
 
