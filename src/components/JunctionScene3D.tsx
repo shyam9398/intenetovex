@@ -45,8 +45,8 @@ const Road: React.FC<{ rotation?: [number, number, number]; isActive?: boolean }
   <mesh rotation={rotation as any} receiveShadow={false}>
     <boxGeometry args={[ROAD_WIDTH, 0.05, ROAD_LENGTH]} />
     <meshStandardMaterial
-      color={isActive ? "#22c55e" : "#2a2f3a"}
-      emissive={isActive ? "#14532d" : "#111827"}
+      color={isActive ? "#3b82f6" : "#2a2f3a"}
+      emissive={isActive ? "#1e3a5f" : "#111827"}
       emissiveIntensity={isActive ? 0.6 : 0.1}
       roughness={0.9} metalness={0}
     />
@@ -143,7 +143,7 @@ const LShapedPath: React.FC<{ approach: string; exit: string | null }> = ({ appr
           <mesh key={i} position={[cx, 0.08, cz]} rotation={[0, angle, 0]}>
             <boxGeometry args={[0.3, 0.04, length]} />
             <meshStandardMaterial
-              color="#22c55e" emissive="#14532d" emissiveIntensity={0.8}
+              color="#3b82f6" emissive="#1e3a5f" emissiveIntensity={0.8}
               transparent opacity={0.85}
             />
           </mesh>
@@ -152,7 +152,7 @@ const LShapedPath: React.FC<{ approach: string; exit: string | null }> = ({ appr
       {/* Arrow at exit end */}
       <mesh position={[exitPos[0], 0.12, exitPos[1]]} rotation={[0, Math.atan2(exitPos[0], exitPos[1]), 0]}>
         <coneGeometry args={[0.2, 0.35, 8]} />
-        <meshStandardMaterial color="#22c55e" emissive="#14532d" emissiveIntensity={0.8} />
+        <meshStandardMaterial color="#3b82f6" emissive="#1e3a5f" emissiveIntensity={0.8} />
       </mesh>
     </group>
   );
@@ -244,7 +244,7 @@ const JunctionScene: React.FC<{
       <JunctionCenter signalRed={signalRed} />
       <GeofenceRing triggered={geofenceTriggered} />
 
-      {/* L-shaped green path for approach + exit */}
+      {/* L-shaped blue path for approach + exit */}
       {approachDir && <LShapedPath approach={approachDir} exit={exitDir} />}
 
       {/* Direction labels at road ends */}
