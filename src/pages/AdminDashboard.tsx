@@ -101,12 +101,16 @@ const AdminDashboard: React.FC = () => {
   }, [selectedJunction, geofences]);
 
   const ambulancesFor3D = useMemo(() => {
-    return activeAmbulances.map((a) => ({
-      id: a.id, driverName: a.driverName, heading: a.heading,
-      exitDirection: a.exitDirection, insideGeofenceId: a.insideGeofenceId,
-      priority: a.priority, speed: a.speed, eta: a.eta,
-    }));
-  }, [activeAmbulances]);
+    // Only show ambulances that are inside THIS junction's geofence
+    const gfId = selectedJunctionGeofence?.id;
+    return activeAmbulances
+      .filter((a) => gfId && a.insideGeofenceId === gfId)
+      .map((a) => ({
+        id: a.id, driverName: a.driverName, heading: a.heading,
+        exitDirection: a.exitDirection, insideGeofenceId: a.insideGeofenceId,
+        priority: a.priority, speed: a.speed, eta: a.eta,
+      }));
+  }, [activeAmbulances, selectedJunctionGeofence]);
 
   const exitDirIcon = (dir: string | null) => {
     if (dir === "left") return <ArrowLeft className="w-3 h-3" />;
