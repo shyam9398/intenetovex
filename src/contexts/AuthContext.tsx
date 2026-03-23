@@ -47,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const [profileRes, rolesRes] = await withTimeout(Promise.all([
         supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", supaUser.id),
-      ]), 5000);
+      ]), 15000);
 
       if (profileRes.error) {
         console.warn("Profile load warning:", profileRes.error.message);

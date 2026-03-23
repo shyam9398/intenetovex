@@ -276,11 +276,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return j;
         })
       );
-    }, 1000);
+    }, 30000); // Refresh every 30 seconds to conserve resources
     return () => clearInterval(interval);
   }, [geofences, junctions, ambulances, addAlert, clearAlertsForAmbulance]);
 
-  // ── Simulate ambulance movement ──
+  // ── Simulate ambulance movement (only for spawned/simulated ambulances, not GPS-tracked ones) ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) =>
