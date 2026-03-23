@@ -37,6 +37,9 @@ const AdminDashboard: React.FC = () => {
 
   const [spawnName, setSpawnName] = useState("");
   const [spawning, setSpawning] = useState(false);
+  const [geoLat, setGeoLat] = useState("");
+  const [geoLng, setGeoLng] = useState("");
+  const [geoMode, setGeoMode] = useState<"junction" | "latlng">("junction");
 
   const filteredJunctions = useMemo(() => {
     if (!searchQuery.trim()) return junctions;
@@ -247,17 +250,53 @@ const AdminDashboard: React.FC = () => {
 
                           {addMode === "geofence" && (
                             <div className="space-y-2">
-                              <select value={selectedJunctionForGeofence ?? ""} onChange={(e) => setSelectedJunctionForGeofence(e.target.value || null)}
-                                className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none">
-                                <option value="">— Choose junction —</option>
-                                {junctions.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
-                              </select>
+                              <div className="flex gap-1">
+                                <button onClick={() => setGeoMode("junction")}
+                                  className={`flex-1 py-1 text-[10px] font-semibold rounded-md border transition-colors ${geoMode === "junction" ? "bg-primary/10 border-primary text-primary" : "bg-secondary border-border text-muted-foreground"}`}>
+                                  At Junction
+                                </button>
+                                <button onClick={() => setGeoMode("latlng")}
+                                  className={`flex-1 py-1 text-[10px] font-semibold rounded-md border transition-colors ${geoMode === "latlng" ? "bg-primary/10 border-primary text-primary" : "bg-secondary border-border text-muted-foreground"}`}>
+                                  Lat/Lng
+                                </button>
+                              </div>
+
+                              {geoMode === "junction" ? (
+                                <select value={selectedJunctionForGeofence ?? ""} onChange={(e) => setSelectedJunctionForGeofence(e.target.value || null)}
+                                  className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none">
+                                  <option value="">— Choose junction —</option>
+                                  {junctions.map((j) => <option key={j.id} value={j.id}>{j.name}</option>)}
+                                </select>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Geofence name..."
+                                    className="w-full px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none" />
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <input type="number" step="any" value={geoLat} onChange={(e) => setGeoLat(e.target.value)} placeholder="Latitude"
+                                      className="px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none" />
+                                    <input type="number" step="any" value={geoLng} onChange={(e) => setGeoLng(e.target.value)} placeholder="Longitude"
+                                      className="px-2.5 py-1.5 bg-secondary border border-border rounded-md text-xs text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/50 focus:outline-none" />
+                                  </div>
+                                </div>
+                              )}
+
                               <div>
                                 <label className="text-[10px] text-muted-foreground">Radius: {newRadius}m</label>
                                 <input type="range" min={100} max={2000} step={50} value={newRadius}
                                   onChange={(e) => setNewRadius(Number(e.target.value))} className="w-full accent-primary" />
                               </div>
-                              <button onClick={handleAddGeofenceAtJunction} disabled={!selectedJunctionForGeofence}
+                              <button onClick={() => {
+                                if (geoMode === "junction") {
+                                  handleAddGeofenceAtJunction();
+                                } else {
+                                  const lat = parseFloat(geoLat);
+                                  const lng = parseFloat(geoLng);
+                                  if (!isNaN(lat) && !isNaN(lng) && newName.trim()) {
+                                    addGeofence({ lat, lng }, newRadius, newName.trim());
+                                    setGeoLat(""); setGeoLng(""); setNewName(""); setAddMode(null);
+                                  }
+                                }
+                              }} disabled={geoMode === "junction" ? !selectedJunctionForGeofence : (!geoLat || !geoLng || !newName.trim())}
                                 className="w-full py-1.5 bg-primary text-primary-foreground font-semibold rounded-md text-xs hover:bg-primary/90 transition-colors disabled:opacity-40">
                                 Add Geofence
                               </button>
