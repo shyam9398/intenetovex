@@ -21,7 +21,7 @@ const AdminDashboard: React.FC = () => {
     addJunction, removeJunction,
     addGeofence, removeGeofence, updateGeofenceRadius,
     addHospital, removeHospital,
-    activateAmbulance,
+    spawnSimulatedAmbulance,
   } = useAppState();
 
   const [addMode, setAddMode] = useState<AddMode>(null);
@@ -73,7 +73,10 @@ const AdminDashboard: React.FC = () => {
     if (!spawnName.trim()) return;
     setSpawning(true);
     try {
-      await activateAmbulance(spawnName.trim());
+      const center = junctions.length > 0
+        ? { lat: junctions[0].position.lat + (Math.random() - 0.5) * 0.01, lng: junctions[0].position.lng + (Math.random() - 0.5) * 0.01 }
+        : { lat: 12.9716 + (Math.random() - 0.5) * 0.01, lng: 77.5946 + (Math.random() - 0.5) * 0.01 };
+      await spawnSimulatedAmbulance(spawnName.trim(), center);
       setSpawnName("");
     } finally {
       setSpawning(false);
