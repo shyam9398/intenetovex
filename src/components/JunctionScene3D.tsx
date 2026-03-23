@@ -244,8 +244,8 @@ const JunctionScene: React.FC<{
       <JunctionCenter signalRed={signalRed} />
       <GeofenceRing triggered={geofenceTriggered} />
 
-      {/* L-shaped blue path for approach + exit */}
-      {approachDir && <LShapedPath approach={approachDir} exit={exitDir} />}
+      {/* L-shaped blue path only when ambulance is inside geofence */}
+      {approachDir && insideAmb?.insideGeofenceId && <LShapedPath approach={approachDir} exit={exitDir} />}
 
       {/* Direction labels at road ends */}
       <DirectionLabel label="N" position={[0, 0.3, -(ROAD_LENGTH / 2 + 0.8)]} />
