@@ -10,9 +10,9 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const JunctionScene3D = lazy(() => import("@/components/JunctionScene3D"));
 
-const MIN_ACCURACY_METERS = 50;
+const MIN_ACCURACY_METERS = 35;
 const MIN_MOVEMENT_METERS = 3;
-const GPS_SEND_INTERVAL_MS = 5000;
+const GPS_SEND_INTERVAL_MS = 3000;
 
 const DriverDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -38,6 +38,7 @@ const DriverDashboard: React.FC = () => {
   const watchIdRef = useRef<number | null>(null);
   const lastGoodPos = useRef<{ lat: number; lng: number } | null>(null);
   const lastSentTime = useRef(0);
+  const lastHeadingRef = useRef(0);
 
   useEffect(() => {
     if (!initialized.current && user) {
@@ -50,6 +51,12 @@ const DriverDashboard: React.FC = () => {
   const recHospital = ambulanceId ? recommendedHospital(ambulanceId) : null;
 
   const applyGpsUpdate = useCallback((position: GeolocationPosition) => {
+    if (!Number.isFinite(position.coords.latitude) || !Number.isFinite(position.coords.longitude)) {
+      setGpsStatus("error");
+      setGpsMessage("Invalid GPS reading received. Retrying...");
+      return;
+    }
+
     if (position.coords.accuracy > MIN_ACCURACY_METERS) {
       setGpsMessage(`Weak GPS signal (${Math.round(position.coords.accuracy)}m). Waiting for better accuracy.`);
       return;
@@ -65,14 +72,17 @@ const DriverDashboard: React.FC = () => {
       if (drift < MIN_MOVEMENT_METERS) return;
     }
 
-    const heading = position.coords.heading ?? myAmbulance?.heading ?? 0;
+    const heading = position.coords.heading != null && !Number.isNaN(position.coords.heading)
+      ? position.coords.heading
+      : myAmbulance?.heading ?? lastHeadingRef.current;
     const speed = position.coords.speed != null && position.coords.speed >= 0
       ? position.coords.speed * 3.6
       : myAmbulance?.speed ?? 0;
 
     lastGoodPos.current = nextPosition;
+    lastHeadingRef.current = heading;
     setGpsStatus("tracking");
-    setGpsMessage(`GPS locked • accuracy ${Math.round(position.coords.accuracy)}m`);
+    setGpsMessage(`GPS locked • accuracy ${Math.round(position.coords.accuracy)}m • live tracking`);
     setMapCenter(nextPosition);
     setFlyTo(nextPosition);
 
@@ -111,7 +121,7 @@ const DriverDashboard: React.FC = () => {
         setGpsStatus("error");
         setGpsMessage("Unable to get current location.");
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
     );
 
     if (watchIdRef.current !== null) {
@@ -132,9 +142,9 @@ const DriverDashboard: React.FC = () => {
           return;
         }
         setGpsStatus("error");
-        setGpsMessage("GPS tracking timed out. Retrying...");
+        setGpsMessage("GPS tracking interrupted. Retrying with high accuracy...");
       },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 25000 }
     );
   }, [applyGpsUpdate]);
 
@@ -145,6 +155,8 @@ const DriverDashboard: React.FC = () => {
     }
     setGpsStatus("off");
     setGpsMessage("");
+    lastGoodPos.current = null;
+    lastSentTime.current = 0;
   }, []);
 
   useEffect(() => () => {
