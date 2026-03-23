@@ -1,15 +1,14 @@
-import React, { useState, useMemo } from "react";
+import React, { forwardRef, useMemo } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useAppState, type LatLng } from "@/contexts/AppStateContext";
 
-// Fix default marker icons
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
@@ -27,6 +26,7 @@ const createJunctionIcon = (signalStatus: "red" | "green") => {
   const color = signalStatus === "red" ? "hsl(0,72%,51%)" : "hsl(142,70%,45%)";
   const glow = signalStatus === "red" ? "rgba(220,38,38,0.6)" : "rgba(34,197,94,0.4)";
   const emoji = signalStatus === "red" ? "🔴" : "🟢";
+
   return new L.DivIcon({
     html: `<div style="background:${color};width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;border:2px solid hsl(0,0%,100%);box-shadow:0 0 10px ${glow};font-size:11px;">${emoji}</div>`,
     className: "",
@@ -48,21 +48,23 @@ interface MapClickHandlerProps {
 
 const MapClickHandler: React.FC<MapClickHandlerProps> = ({ onClick }) => {
   useMapEvents({
-    click(e) {
-      onClick?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    click(event) {
+      onClick?.({ lat: event.latlng.lat, lng: event.latlng.lng });
     },
   });
+
   return null;
 };
 
-// Component to fly map to a location
 const FlyToLocation: React.FC<{ center: LatLng | null }> = ({ center }) => {
   const map = useMap();
+
   React.useEffect(() => {
     if (center) {
-      map.flyTo([center.lat, center.lng], 14, { duration: 1 });
+      map.flyTo([center.lat, center.lng], Math.max(map.getZoom(), 15), { duration: 1 });
     }
   }, [center, map]);
+
   return null;
 };
 
@@ -76,7 +78,7 @@ interface MapViewProps {
   flyToCenter?: LatLng | null;
 }
 
-const MapView: React.FC<MapViewProps> = ({
+const MapView = forwardRef<HTMLDivElement, MapViewProps>(({
   onMapClick,
   onJunctionClick,
   showAmbulances = true,
@@ -84,19 +86,19 @@ const MapView: React.FC<MapViewProps> = ({
   center = { lat: 12.9716, lng: 77.5946 },
   searchQuery = "",
   flyToCenter = null,
-}) => {
+}, ref) => {
   const { junctions, geofences, hospitals, ambulances } = useAppState();
 
   const displayAmbulances = showAmbulances
-    ? ambulances.filter((a) => a.active)
+    ? ambulances.filter((ambulance) => ambulance.active)
     : driverAmbulanceId
-    ? ambulances.filter((a) => a.id === driverAmbulanceId)
-    : [];
+      ? ambulances.filter((ambulance) => ambulance.id === driverAmbulanceId && ambulance.active)
+      : [];
 
   const filteredJunctions = useMemo(() => {
     if (!searchQuery.trim()) return junctions;
-    const q = searchQuery.toLowerCase();
-    return junctions.filter((j) => j.name.toLowerCase().includes(q));
+    const query = searchQuery.toLowerCase();
+    return junctions.filter((junction) => junction.name.toLowerCase().includes(query));
   }, [junctions, searchQuery]);
 
   const headingToLabel = (deg: number) => {
@@ -107,113 +109,115 @@ const MapView: React.FC<MapViewProps> = ({
   };
 
   return (
-    <MapContainer
-      center={[center.lat, center.lng]}
-      zoom={14}
-      className="w-full h-full rounded-lg"
-      style={{ minHeight: "400px" }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {onMapClick && <MapClickHandler onClick={onMapClick} />}
-      {flyToCenter && <FlyToLocation center={flyToCenter} />}
+    <div ref={ref} className="w-full h-full">
+      <MapContainer
+        center={[center.lat, center.lng]}
+        zoom={14}
+        className="w-full h-full rounded-lg"
+        style={{ minHeight: "400px" }}
+        preferCanvas
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-      {/* Geofences */}
-      {geofences.map((gf) => (
-        <Circle
-          key={gf.id}
-          center={[gf.center.lat, gf.center.lng]}
-          radius={gf.radius}
-          pathOptions={{
-            color: gf.triggered ? "hsl(0,72%,51%)" : "hsl(38,92%,50%)",
-            fillColor: gf.triggered ? "hsl(0,72%,51%)" : "hsl(38,92%,50%)",
-            fillOpacity: gf.triggered ? 0.25 : 0.1,
-            weight: 2,
-            dashArray: gf.triggered ? undefined : "6 4",
-          }}
-        >
-          <Popup>
-            <div className="text-sm">
-              <strong>{gf.name}</strong>
-              <br />
-              Radius: {gf.radius}m
-              <br />
-              Status: {gf.triggered ? "⚠️ TRIGGERED" : "Monitoring"}
-            </div>
-          </Popup>
-        </Circle>
-      ))}
+        {onMapClick && <MapClickHandler onClick={onMapClick} />}
+        {flyToCenter && <FlyToLocation center={flyToCenter} />}
 
-      {/* Junctions with traffic signal colors */}
-      {filteredJunctions.map((j) => (
-        <Marker key={j.id} position={[j.position.lat, j.position.lng]} icon={createJunctionIcon(j.signalStatus)}>
-          <Popup>
-            <div className="text-sm">
-              <strong>{j.name}</strong>
-              <br />
-              Signal: {j.signalStatus === "red" ? "🔴 RED — Ambulance nearby" : "🟢 GREEN — Clear"}
-              {onJunctionClick && (
-                <>
-                  <br />
-                  <button
-                    onClick={() => onJunctionClick(j.id)}
-                    style={{
-                      marginTop: "6px",
-                      padding: "4px 10px",
-                      background: "hsl(221,83%,53%)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      width: "100%",
-                    }}
-                  >
-                    🔲 View 3D Map
-                  </button>
-                </>
-              )}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+        {geofences.map((geofence) => (
+          <Circle
+            key={geofence.id}
+            center={[geofence.center.lat, geofence.center.lng]}
+            radius={geofence.radius}
+            pathOptions={{
+              color: geofence.triggered ? "hsl(0,72%,51%)" : "hsl(38,92%,50%)",
+              fillColor: geofence.triggered ? "hsl(0,72%,51%)" : "hsl(38,92%,50%)",
+              fillOpacity: geofence.triggered ? 0.25 : 0.1,
+              weight: 2,
+              dashArray: geofence.triggered ? undefined : "6 4",
+            }}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>{geofence.name}</strong>
+                <br />
+                Radius: {geofence.radius}m
+                <br />
+                Status: {geofence.triggered ? "⚠️ TRIGGERED" : "Monitoring"}
+              </div>
+            </Popup>
+          </Circle>
+        ))}
 
-      {/* Hospitals */}
-      {hospitals.map((h) => (
-        <Marker key={h.id} position={[h.position.lat, h.position.lng]} icon={hospitalIcon}>
-          <Popup>
-            <strong>{h.name}</strong>
-            <br />
-            Hospital
-          </Popup>
-        </Marker>
-      ))}
+        {filteredJunctions.map((junction) => (
+          <Marker key={junction.id} position={[junction.position.lat, junction.position.lng]} icon={createJunctionIcon(junction.signalStatus)}>
+            <Popup>
+              <div className="text-sm">
+                <strong>{junction.name}</strong>
+                <br />
+                Signal: {junction.signalStatus === "red" ? "🔴 RED — Ambulance nearby" : "🟢 GREEN — Clear"}
+                {onJunctionClick && (
+                  <>
+                    <br />
+                    <button
+                      onClick={() => onJunctionClick(junction.id)}
+                      style={{
+                        marginTop: "6px",
+                        padding: "4px 10px",
+                        background: "hsl(221,83%,53%)",
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        width: "100%",
+                      }}
+                    >
+                      🔲 View 3D Map
+                    </button>
+                  </>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
-      {/* Ambulances */}
-      {displayAmbulances.map((amb) => (
-        <Marker key={amb.id} position={[amb.position.lat, amb.position.lng]} icon={ambulanceIcon}>
-          <Popup>
-            <div className="text-sm">
-              <strong>🚑 {amb.driverName}</strong>
+        {hospitals.map((hospital) => (
+          <Marker key={hospital.id} position={[hospital.position.lat, hospital.position.lng]} icon={hospitalIcon}>
+            <Popup>
+              <strong>{hospital.name}</strong>
               <br />
-              Speed: {amb.speed.toFixed(0)} km/h
-              <br />
-              Approach: {headingToLabel(amb.heading)}
-              <br />
-              Exit: {amb.exitDirection ?? "Not set"}
-              <br />
-              ETA: {amb.eta ? `${Math.round(amb.eta)}s` : "N/A"}
-              <br />
-              Priority: #{amb.priority || "—"}
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+              Hospital
+            </Popup>
+          </Marker>
+        ))}
+
+        {displayAmbulances.map((ambulance) => (
+          <Marker key={ambulance.id} position={[ambulance.position.lat, ambulance.position.lng]} icon={ambulanceIcon}>
+            <Popup>
+              <div className="text-sm">
+                <strong>🚑 {ambulance.driverName}</strong>
+                <br />
+                Speed: {ambulance.speed.toFixed(0)} km/h
+                <br />
+                Approach: {headingToLabel(ambulance.heading)}
+                <br />
+                Exit: {ambulance.exitDirection ?? "Not set"}
+                <br />
+                ETA: {ambulance.eta ? `${Math.round(ambulance.eta)}s` : "N/A"}
+                <br />
+                Priority: #{ambulance.priority || "—"}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+    </div>
   );
-};
+});
+
+MapView.displayName = "MapView";
 
 export default MapView;
