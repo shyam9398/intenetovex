@@ -4,14 +4,14 @@ import { useAppState, type ExitDirection, haversineDistance } from "@/contexts/A
 import MapView from "@/components/MapView";
 import {
   LogOut, ArrowLeft, ArrowUp, ArrowRight, Building2, Siren, Navigation, MapPin, Locate,
-  RefreshCw, Box, XCircle, Hospital,
+  RefreshCw, Box, XCircle, Hospital, AlertTriangle,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const JunctionScene3D = lazy(() => import("@/components/JunctionScene3D"));
 
 const MIN_ACCURACY_METERS = 50;
-const GPS_UPDATE_INTERVAL_MS = 60000; // Send position updates every 1 minute
+const GPS_SEND_INTERVAL_MS = 10000; // Send to server every 10s for better responsiveness
 
 const DriverDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -22,7 +22,8 @@ const DriverDashboard: React.FC = () => {
   } = useAppState();
 
   const [ambulanceId, setAmbulanceId] = useState<string | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<"off" | "tracking" | "error">("off");
+  const [gpsStatus, setGpsStatus] = useState<"off" | "tracking" | "error" | "unavailable">("off");
+  const [gpsMessage, setGpsMessage] = useState<string>("");
   const [geofenceStatus, setGeofenceStatus] = useState<"outside" | "inside">("outside");
   const [mapCenter, setMapCenter] = useState({ lat: 12.9716, lng: 77.5946 });
   const [flyTo, setFlyTo] = useState<{ lat: number; lng: number } | null>(null);
@@ -44,13 +45,22 @@ const DriverDashboard: React.FC = () => {
   const myAmbulance = ambulances.find((a) => a.id === ambulanceId);
   const recHospital = ambulanceId ? recommendedHospital(ambulanceId) : null;
 
-  // GPS tracking with accuracy filtering + 1-minute update interval
+  // GPS tracking with accuracy filtering
   const startGPSTracking = useCallback(() => {
-    if (!navigator.geolocation) { setGpsStatus("error"); return; }
+    if (!navigator.geolocation) {
+      setGpsStatus("unavailable");
+      setGpsMessage("GPS is not supported on this device/browser.");
+      return;
+    }
     setGpsStatus("tracking");
+    setGpsMessage("Acquiring GPS signal...");
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        if (pos.coords.accuracy > MIN_ACCURACY_METERS) return;
+        if (pos.coords.accuracy > MIN_ACCURACY_METERS) {
+          setGpsMessage(`Low accuracy: ${Math.round(pos.coords.accuracy)}m — waiting for better signal`);
+          return;
+        }
         const newPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         // Filter drift: ignore tiny movements when likely stationary
         if (lastGoodPos.current) {
@@ -59,20 +69,35 @@ const DriverDashboard: React.FC = () => {
         }
         lastGoodPos.current = newPos;
         const heading = pos.coords.heading ?? 0;
+        const speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0; // m/s → km/h
+
+        setGpsMessage(`Accuracy: ${Math.round(pos.coords.accuracy)}m`);
 
         // Always update local map position for smooth UX
         setMapCenter(newPos);
         setFlyTo(newPos);
 
-        // Only send to server every 1 minute
+        // Send to server at interval
         const now = Date.now();
-        if (now - lastSentTime.current >= GPS_UPDATE_INTERVAL_MS) {
+        if (now - lastSentTime.current >= GPS_SEND_INTERVAL_MS) {
           lastSentTime.current = now;
           if (ambulanceId) updateAmbulancePosition(ambulanceId, newPos, heading);
         }
       },
-      (err) => { console.warn("GPS error:", err.message); setGpsStatus("error"); },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      (err) => {
+        console.warn("GPS error:", err.message);
+        if (err.code === 1) {
+          setGpsStatus("error");
+          setGpsMessage("Location permission denied. Please allow GPS access.");
+        } else if (err.code === 2) {
+          setGpsStatus("unavailable");
+          setGpsMessage("GPS signal unavailable. Move to an open area.");
+        } else {
+          setGpsStatus("error");
+          setGpsMessage("GPS timed out. Retrying...");
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
     );
   }, [ambulanceId, updateAmbulancePosition]);
 
@@ -82,15 +107,16 @@ const DriverDashboard: React.FC = () => {
       watchIdRef.current = null;
     }
     setGpsStatus("off");
+    setGpsMessage("");
   }, []);
 
   useEffect(() => {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, []);
 
-  // Geofence detection
+  // Geofence detection (local, immediate)
   useEffect(() => {
-    if (!myAmbulance) return;
+    if (!myAmbulance || (myAmbulance.position.lat === 0 && myAmbulance.position.lng === 0)) return;
     let inside = false;
     for (const gf of geofences) {
       if (haversineDistance(myAmbulance.position, gf.center) <= gf.radius) { inside = true; break; }
@@ -99,7 +125,7 @@ const DriverDashboard: React.FC = () => {
     setGeofenceStatus(inside ? "inside" : "outside");
     if (inside && prev === "outside") setShowDriverAlert(true);
     if (!inside && prev === "inside") setShowDriverAlert(false);
-  }, [myAmbulance?.position, geofences]);
+  }, [myAmbulance?.position.lat, myAmbulance?.position.lng, geofences]);
 
   // Auto-select exit based on nearest hospital
   const handleRecommendHospital = useCallback(() => {
@@ -131,16 +157,18 @@ const DriverDashboard: React.FC = () => {
 
   const isInsideGeofence = geofenceStatus === "inside";
 
-  const nearestJunction = myAmbulance ? junctions.reduce<typeof junctions[0] | null>((best, j) => {
-    const d = haversineDistance(myAmbulance.position, j.position);
-    if (!best) return j;
-    return d < haversineDistance(myAmbulance.position, best.position) ? j : best;
-  }, null) : null;
+  const nearestJunction = myAmbulance && myAmbulance.position.lat !== 0
+    ? junctions.reduce<typeof junctions[0] | null>((best, j) => {
+        const d = haversineDistance(myAmbulance.position, j.position);
+        if (!best) return j;
+        return d < haversineDistance(myAmbulance.position, best.position) ? j : best;
+      }, null)
+    : null;
 
   const selected3DJunction = junctions.find(j => j.id === selected3DJunctionId);
   const sel3DGeofence = selected3DJunction ? geofences.find(g => {
     const dist = Math.sqrt(Math.pow(g.center.lat - selected3DJunction.position.lat, 2) + Math.pow(g.center.lng - selected3DJunction.position.lng, 2));
-    return dist < 0.001;
+    return dist < 0.01;
   }) : null;
 
   return (
@@ -154,11 +182,11 @@ const DriverDashboard: React.FC = () => {
           <button onClick={gpsStatus === "tracking" ? stopGPSTracking : startGPSTracking}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
               gpsStatus === "tracking" ? "border-green-500/50 bg-green-500/10 text-green-600"
-              : gpsStatus === "error" ? "border-destructive/50 bg-destructive/10 text-destructive"
+              : gpsStatus === "error" || gpsStatus === "unavailable" ? "border-destructive/50 bg-destructive/10 text-destructive"
               : "border-border bg-secondary text-muted-foreground hover:text-foreground"
             }`}>
             <Locate className={`w-3.5 h-3.5 ${gpsStatus === "tracking" ? "animate-pulse" : ""}`} />
-            {gpsStatus === "tracking" ? "GPS Active" : gpsStatus === "error" ? "GPS Error" : "Start GPS"}
+            {gpsStatus === "tracking" ? "GPS Active" : gpsStatus === "error" ? "GPS Error" : gpsStatus === "unavailable" ? "No GPS" : "Start GPS"}
           </button>
           <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
           <button onClick={() => window.location.reload()} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh">
@@ -189,6 +217,21 @@ const DriverDashboard: React.FC = () => {
           ) : (
             <>
               <MapView driverAmbulanceId={ambulanceId} showAmbulances={false} center={mapCenter} flyToCenter={flyTo} />
+
+              {/* GPS status message */}
+              {gpsMessage && (
+                <div className="absolute bottom-3 left-3 z-[1000]">
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium shadow border backdrop-blur-sm ${
+                    gpsStatus === "error" || gpsStatus === "unavailable"
+                      ? "bg-destructive/90 text-destructive-foreground border-destructive/50"
+                      : "bg-card/90 text-muted-foreground border-border"
+                  }`}>
+                    {(gpsStatus === "error" || gpsStatus === "unavailable") && <AlertTriangle className="w-3.5 h-3.5" />}
+                    {gpsMessage}
+                  </div>
+                </div>
+              )}
+
               <div className="absolute top-3 left-3 z-[1000]">
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold shadow-lg border ${
                   isInsideGeofence ? "bg-primary/90 text-primary-foreground border-primary/50"

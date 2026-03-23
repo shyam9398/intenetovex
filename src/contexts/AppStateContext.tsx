@@ -41,6 +41,7 @@ export interface Ambulance {
   eta: number | null;
   priority: number;
   active: boolean;
+  isSimulated?: boolean; // true for admin-spawned, false for real GPS drivers
 }
 
 export interface Alert {
@@ -65,6 +66,7 @@ interface AppStateContextType {
   addHospital: (position: LatLng, name: string) => Promise<void>;
   removeHospital: (id: string) => Promise<void>;
   activateAmbulance: (driverName: string) => Promise<string>;
+  spawnSimulatedAmbulance: (driverName: string, position: LatLng) => Promise<string>;
   updateAmbulancePosition: (id: string, position: LatLng, heading: number) => void;
   setAmbulanceExitDirection: (id: string, dir: ExitDirection) => Promise<void>;
   addAlert: (message: string, type: Alert["type"], ambulanceId?: string) => void;
@@ -121,10 +123,14 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (data) setAmbulances(data.map(dbToAmb));
   }, []);
 
+  // ── Clear stale ambulances on session start ──
   useEffect(() => {
-    if (!session) return;
-    loadJunctions(); loadGeofences(); loadHospitals(); loadAmbulances();
-  }, [session, loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
+    if (!session || !user) return;
+    // Deactivate all ambulances from previous sessions for this user
+    supabase.from("ambulances").update({ active: false }).eq("driver_id", user.id).then(() => {
+      loadJunctions(); loadGeofences(); loadHospitals(); loadAmbulances();
+    });
+  }, [session, user, loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
 
   // ── Realtime ──
   useEffect(() => {
@@ -144,7 +150,6 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
-  // Clear alerts for a specific ambulance
   const clearAlertsForAmbulance = useCallback((ambulanceId: string) => {
     setAlerts((prev) => prev.filter((a) => a.ambulanceId !== ambulanceId));
   }, []);
@@ -169,24 +174,36 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
   const removeHospital = useCallback(async (id: string) => { await supabase.from("hospitals").delete().eq("id", id); }, []);
 
+  // Driver activates their own ambulance (GPS-tracked, NOT simulated)
   const activateAmbulance = useCallback(async (driverName: string): Promise<string> => {
     if (!user) throw new Error("Not authenticated");
-    const startJunction = junctions[Math.floor(Math.random() * Math.max(junctions.length, 1))];
-    const startPos = startJunction
-      ? { lat: startJunction.position.lat + (Math.random() - 0.5) * 0.01, lng: startJunction.position.lng + (Math.random() - 0.5) * 0.01 }
-      : { lat: 12.9716 + (Math.random() - 0.5) * 0.01, lng: 77.5946 + (Math.random() - 0.5) * 0.01 };
 
     const { data, error } = await supabase.from("ambulances").insert({
       driver_id: user.id, driver_name: driverName,
-      lat: startPos.lat, lng: startPos.lng,
-      speed: 40 + Math.random() * 40, heading: Math.random() * 360, active: true,
+      lat: 0, lng: 0, // Will be updated by GPS
+      speed: 0, heading: 0, active: true,
     }).select().single();
 
     if (error || !data) throw new Error("Failed to activate ambulance");
     myAmbulanceId.current = data.id;
     addAlert(`🚑 ${driverName} is now active`, "info", data.id);
     return data.id;
-  }, [user, junctions, addAlert]);
+  }, [user, addAlert]);
+
+  // Admin spawns a simulated ambulance
+  const spawnSimulatedAmbulance = useCallback(async (driverName: string, position: LatLng): Promise<string> => {
+    if (!user) throw new Error("Not authenticated");
+
+    const { data, error } = await supabase.from("ambulances").insert({
+      driver_id: user.id, driver_name: driverName,
+      lat: position.lat, lng: position.lng,
+      speed: 40 + Math.random() * 40, heading: Math.random() * 360, active: true,
+    }).select().single();
+
+    if (error || !data) throw new Error("Failed to spawn ambulance");
+    addAlert(`🚑 Simulated ${driverName} spawned`, "info", data.id);
+    return data.id;
+  }, [user, addAlert]);
 
   const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number) => {
     setAmbulances((prev) => prev.map((a) => (a.id === id ? { ...a, position, heading } : a)));
@@ -210,7 +227,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return closest;
   }, [ambulances, hospitals]);
 
-  // ── Geofence detection, ETA, signals, auto-clear ──
+  // ── Geofence detection — runs every 3 seconds for responsiveness ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) => {
@@ -239,22 +256,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             clearAlertsForAmbulance(amb.id);
             supabase.from("geofences").update({ triggered: false }).eq("id", amb.insideGeofenceId);
             setGeofences((gfs) => gfs.map((g) => (g.id === amb.insideGeofenceId ? { ...g, triggered: false } : g)));
-            // Reset exit direction on exit
             supabase.from("ambulances").update({ exit_direction: null }).eq("id", amb.id);
           }
 
           let minEta: number | null = null;
           for (const j of junctions) {
             const dist = haversineDistance(amb.position, j.position);
-            const etaSeconds = dist / ((amb.speed * 1000) / 3600);
-            if (minEta === null || etaSeconds < minEta) minEta = etaSeconds;
+            const etaSeconds = amb.speed > 0 ? dist / ((amb.speed * 1000) / 3600) : null;
+            if (etaSeconds !== null && (minEta === null || etaSeconds < minEta)) minEta = etaSeconds;
           }
 
           return {
             ...amb,
             insideGeofenceId: insideId,
             eta: minEta,
-            // Clear exit direction when leaving geofence
             exitDirection: !insideId && amb.insideGeofenceId ? null : amb.exitDirection,
           };
         });
@@ -276,16 +291,18 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return j;
         })
       );
-    }, 30000); // Refresh every 30 seconds to conserve resources
+    }, 3000); // Check every 3 seconds for responsive geofence detection
     return () => clearInterval(interval);
   }, [geofences, junctions, ambulances, addAlert, clearAlertsForAmbulance]);
 
-  // ── Simulate ambulance movement (only for spawned/simulated ambulances, not GPS-tracked ones) ──
+  // ── Simulate movement ONLY for admin-spawned ambulances (not driver GPS-tracked ones) ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) =>
         prev.map((amb) => {
           if (!amb.active) return amb;
+          // Skip the current user's own ambulance (GPS-tracked)
+          if (amb.id === myAmbulanceId.current) return amb;
           const speedMs = (amb.speed * 1000) / 3600;
           const rad = (amb.heading * Math.PI) / 180;
           const dLat = (speedMs * Math.cos(rad)) / 111320;
@@ -294,7 +311,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return { ...amb, position: { lat: amb.position.lat + dLat, lng: amb.position.lng + dLng }, heading: newHeading % 360 };
         })
       );
-    }, 1000);
+    }, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -302,7 +319,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     <AppStateContext.Provider value={{
       junctions, geofences, hospitals, ambulances, alerts,
       addJunction, removeJunction, addGeofence, removeGeofence, updateGeofenceRadius,
-      addHospital, removeHospital, activateAmbulance, updateAmbulancePosition, setAmbulanceExitDirection,
+      addHospital, removeHospital, activateAmbulance, spawnSimulatedAmbulance,
+      updateAmbulancePosition, setAmbulanceExitDirection,
       addAlert, dismissAlert, recommendedHospital,
     }}>
       {children}
