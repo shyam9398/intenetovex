@@ -87,6 +87,7 @@ const AdminDashboard: React.FC = () => {
 
   const selectedJunction = junctions.find((j) => j.id === selectedJunctionId);
   const activeAmbulances = ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority);
+  const ambulancesInsideGeofence = activeAmbulances.filter((a) => a.insideGeofenceId);
 
   const selectedJunctionGeofence = useMemo(() => {
     if (!selectedJunction) return null;
@@ -439,6 +440,37 @@ const AdminDashboard: React.FC = () => {
                   Click map to add {addMode}: "{newName || "..."}"
                 </div>
               )}
+
+              {/* Live geofence entry alerts overlay */}
+              <AnimatePresence>
+                {ambulancesInsideGeofence.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-3 right-3 z-[1000] space-y-2 max-w-xs"
+                  >
+                    {ambulancesInsideGeofence.map((amb) => {
+                      const gf = geofences.find((g) => g.id === amb.insideGeofenceId);
+                      return (
+                        <motion.div
+                          key={amb.id}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-destructive/90 text-destructive-foreground rounded-lg shadow-lg border border-destructive/50 backdrop-blur-sm"
+                        >
+                          <Siren className="w-4 h-4 animate-pulse shrink-0" />
+                          <div className="text-xs">
+                            <p className="font-bold">🚑 {amb.driverName} entered zone</p>
+                            <p className="opacity-80">{gf?.name ?? "Geofence"} • Exit: {amb.exitDirection ?? "not set"}</p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </main>
