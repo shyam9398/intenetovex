@@ -87,6 +87,7 @@ const AdminDashboard: React.FC = () => {
 
   const selectedJunction = junctions.find((j) => j.id === selectedJunctionId);
   const activeAmbulances = ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority);
+  const ambulancesInsideGeofence = activeAmbulances.filter((a) => a.insideGeofenceId);
 
   const selectedJunctionGeofence = useMemo(() => {
     if (!selectedJunction) return null;
