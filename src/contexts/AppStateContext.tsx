@@ -280,7 +280,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => clearInterval(interval);
   }, [geofences, junctions, ambulances, addAlert, clearAlertsForAmbulance]);
 
-  // ── Simulate ambulance movement ──
+  // ── Simulate ambulance movement (only for spawned/simulated ambulances, not GPS-tracked ones) ──
   useEffect(() => {
     const interval = setInterval(() => {
       setAmbulances((prev) =>
