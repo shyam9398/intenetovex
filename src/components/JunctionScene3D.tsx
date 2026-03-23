@@ -45,8 +45,8 @@ const Road: React.FC<{ rotation?: [number, number, number]; isActive?: boolean }
   <mesh rotation={rotation as any} receiveShadow={false}>
     <boxGeometry args={[ROAD_WIDTH, 0.05, ROAD_LENGTH]} />
     <meshStandardMaterial
-      color={isActive ? "#22c55e" : "#2a2f3a"}
-      emissive={isActive ? "#14532d" : "#111827"}
+      color={isActive ? "#3b82f6" : "#2a2f3a"}
+      emissive={isActive ? "#1e3a5f" : "#111827"}
       emissiveIntensity={isActive ? 0.6 : 0.1}
       roughness={0.9} metalness={0}
     />
