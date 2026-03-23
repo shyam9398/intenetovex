@@ -146,16 +146,13 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     if (!session || !user) return;
-    supabase
-      .from("ambulances")
-      .update({ active: false, inside_geofence_id: null, eta: null, priority: 0, exit_direction: null })
-      .eq("driver_id", user.id)
-      .then(() => {
-        loadJunctions();
-        loadGeofences();
-        loadHospitals();
-        loadAmbulances();
-      });
+
+    void Promise.all([
+      loadJunctions(),
+      loadGeofences(),
+      loadHospitals(),
+      loadAmbulances(),
+    ]);
   }, [session, user, loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
 
   useEffect(() => {
@@ -217,6 +214,11 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const activateAmbulance = useCallback(async (driverName: string): Promise<string> => {
     if (!user) throw new Error("Not authenticated");
 
+    await supabase
+      .from("ambulances")
+      .update({ active: false, inside_geofence_id: null, eta: null, priority: 0, exit_direction: null })
+      .eq("driver_id", user.id);
+
     const { data, error } = await supabase
       .from("ambulances")
       .insert({
@@ -269,6 +271,8 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number, speed = 0) => {
     const insideGeofenceId = geofences.find((gf) => haversineDistance(position, gf.center) <= gf.radius)?.id ?? null;
 
+    myAmbulanceId.current = id;
+
     setAmbulances((prev) => prev.map((a) => (
       a.id === id
         ? { ...a, position, heading, speed, insideGeofenceId }
@@ -278,13 +282,19 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     void supabase
       .from("ambulances")
       .update({
+        active: true,
         lat: position.lat,
         lng: position.lng,
         heading,
         speed,
         inside_geofence_id: insideGeofenceId,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .then(({ error }) => {
+        if (error) {
+          console.error("Failed to sync ambulance GPS:", error.message);
+        }
+      });
   }, [geofences]);
 
   const setAmbulanceExitDirection = useCallback(async (id: string, dir: ExitDirection) => {
