@@ -37,6 +37,9 @@ const AdminDashboard: React.FC = () => {
 
   const [spawnName, setSpawnName] = useState("");
   const [spawning, setSpawning] = useState(false);
+  const [geoLat, setGeoLat] = useState("");
+  const [geoLng, setGeoLng] = useState("");
+  const [geoMode, setGeoMode] = useState<"junction" | "latlng">("junction");
 
   const filteredJunctions = useMemo(() => {
     if (!searchQuery.trim()) return junctions;
