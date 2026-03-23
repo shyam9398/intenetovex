@@ -1,6 +1,6 @@
 import React, { useState, useMemo, lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAppState, type LatLng } from "@/contexts/AppStateContext";
+import { useAppState, type LatLng, haversineDistance } from "@/contexts/AppStateContext";
 import MapView from "@/components/MapView";
 import AlertPanel from "@/components/AlertPanel";
 import {
