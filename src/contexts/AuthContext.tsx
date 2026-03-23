@@ -33,6 +33,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isDriverPhoneEmail = useCallback((value?: string) => Boolean(value && value.endsWith("@ambulance.local")), []);
+
+  const phoneFromDriverEmail = useCallback((value?: string) => {
+    if (!isDriverPhoneEmail(value)) return null;
+    return value?.replace("@ambulance.local", "") ?? null;
+  }, [isDriverPhoneEmail]);
+
   const withTimeout = useCallback(async <T,>(promise: Promise<T>, timeoutMs = 5000): Promise<T> => {
     return await Promise.race([
       promise,
@@ -56,17 +63,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn("Role load warning:", rolesRes.error.message);
       }
 
-      const name = profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User";
       const roles = (rolesRes.data ?? []).map((r) => r.role as UserRole);
       const role: UserRole = roles.includes("admin") ? "admin" : "driver";
+      const phoneIdentity = phoneFromDriverEmail(supaUser.email);
+      const name = role === "driver"
+        ? (phoneIdentity ?? profileRes.data?.name ?? "Driver")
+        : (profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User");
 
       setUser({ id: supaUser.id, name, email: supaUser.email, role });
     } catch (err) {
       console.error("Failed to load user profile:", err);
-      const fallbackName = supaUser.email?.split("@")[0] ?? "User";
+      const fallbackName = phoneFromDriverEmail(supaUser.email) ?? supaUser.email?.split("@")[0] ?? "User";
       setUser({ id: supaUser.id, name: fallbackName, email: supaUser.email, role: "driver" });
     }
-  }, [withTimeout]);
+  }, [phoneFromDriverEmail, withTimeout]);
 
   useEffect(() => {
     let isMounted = true;

@@ -17,7 +17,6 @@ const LoginPage: React.FC = () => {
 
   // Driver fields (phone OTP)
   const [phone, setPhone] = useState("");
-  const [driverName, setDriverName] = useState("");
   const [step, setStep] = useState<Step>("phone");
   const [generatedOTP, setGeneratedOTP] = useState("");
   const [enteredOTP, setEnteredOTP] = useState("");
@@ -27,8 +26,9 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [adminName, setAdminName] = useState("");
 
-  const phoneToEmail = (p: string) => `${p.replace(/[^0-9]/g, "")}@ambulance.local`;
-  const phoneToPassword = (p: string) => `amb_${p.replace(/[^0-9]/g, "")}_secure`;
+  const normalizePhone = (p: string) => p.replace(/[^0-9]/g, "");
+  const phoneToEmail = (p: string) => `${normalizePhone(p)}@ambulance.local`;
+  const phoneToPassword = (p: string) => `amb_${normalizePhone(p)}_secure`;
 
   const resetFlow = () => {
     setStep("phone");
@@ -44,10 +44,6 @@ const LoginPage: React.FC = () => {
     const digits = phone.replace(/[^0-9]/g, "");
     if (digits.length < 10) {
       setError("Enter a valid phone number (min 10 digits)");
-      return;
-    }
-    if (mode === "signup" && !driverName.trim()) {
-      setError("Name is required");
       return;
     }
     const otp = generateOTP();
@@ -67,8 +63,10 @@ const LoginPage: React.FC = () => {
     const mappedEmail = phoneToEmail(phone);
     const mappedPassword = phoneToPassword(phone);
 
+    const driverIdentity = normalizePhone(phone);
+
     if (mode === "signup") {
-      const { error } = await signup(mappedEmail, mappedPassword, "driver", driverName.trim());
+      const { error } = await signup(mappedEmail, mappedPassword, "driver", driverIdentity);
       if (error) {
         if (error.includes("already") || error.includes("exists")) {
           const loginRes = await login(mappedEmail, mappedPassword, "driver");
@@ -228,16 +226,6 @@ const LoginPage: React.FC = () => {
             <AnimatePresence mode="wait">
               {step === "phone" ? (
                 <motion.form key="phone-step" onSubmit={handleSendOTP} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
-                  {mode === "signup" && (
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Name</label>
-                      <input
-                        type="text" value={driverName} onChange={(e) => setDriverName(e.target.value)}
-                        placeholder="Your full name"
-                        className="w-full px-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                      />
-                    </div>
-                  )}
                   <div>
                     <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Phone Number</label>
                     <div className="relative">
