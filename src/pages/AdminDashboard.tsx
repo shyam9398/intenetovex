@@ -96,15 +96,16 @@ const AdminDashboard: React.FC = () => {
         Math.pow(g.center.lat - selectedJunction.position.lat, 2) +
         Math.pow(g.center.lng - selectedJunction.position.lng, 2)
       );
-      return dist < 0.001;
+      return dist < 0.01;
     });
   }, [selectedJunction, geofences]);
 
   const ambulancesFor3D = useMemo(() => {
-    // Only show ambulances that are inside THIS junction's geofence
+    // Show ambulances inside THIS junction's geofence with their data intact
     const gfId = selectedJunctionGeofence?.id;
+    if (!gfId) return [];
     return activeAmbulances
-      .filter((a) => gfId && a.insideGeofenceId === gfId)
+      .filter((a) => a.insideGeofenceId === gfId)
       .map((a) => ({
         id: a.id, driverName: a.driverName, heading: a.heading,
         exitDirection: a.exitDirection, insideGeofenceId: a.insideGeofenceId,
