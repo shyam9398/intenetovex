@@ -21,7 +21,7 @@ const AdminDashboard: React.FC = () => {
     addJunction, removeJunction,
     addGeofence, removeGeofence, updateGeofenceRadius,
     addHospital, removeHospital,
-    activateAmbulance,
+    spawnSimulatedAmbulance,
   } = useAppState();
 
   const [addMode, setAddMode] = useState<AddMode>(null);
