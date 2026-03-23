@@ -92,11 +92,11 @@ const AdminDashboard: React.FC = () => {
   const selectedJunctionGeofence = useMemo(() => {
     if (!selectedJunction) return null;
     return geofences.find((g) => {
-      const dist = Math.sqrt(
-        Math.pow(g.center.lat - selectedJunction.position.lat, 2) +
-        Math.pow(g.center.lng - selectedJunction.position.lng, 2)
+      const dist = haversineDistance(
+        { lat: g.center.lat, lng: g.center.lng },
+        selectedJunction.position
       );
-      return dist < 0.01;
+      return dist <= g.radius;
     });
   }, [selectedJunction, geofences]);
 
