@@ -301,7 +301,7 @@ const DriverDashboard: React.FC = () => {
                   junctionName={selected3DJunction.name}
                   signalRed={selected3DJunction.signalStatus === "red"}
                   geofenceTriggered={selected3DGeofence?.triggered ?? false}
-                  ambulances={myAmbulance ? [{
+                  ambulances={myAmbulance && selected3DGeofence && myAmbulance.insideGeofenceId === selected3DGeofence.id ? [{
                     id: myAmbulance.id,
                     driverName: myAmbulance.driverName,
                     heading: myAmbulance.heading,
