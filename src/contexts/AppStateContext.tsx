@@ -286,7 +286,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user, addAlert]);
 
   const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number, speed = 0) => {
-    const insideGeofenceId = geofences.find((gf) => haversineDistance(position, gf.center) <= gf.radius)?.id ?? null;
+    const insideGeofenceId = geofences.find((gf) => haversineDistance(position, gf.center) <= (gf.radius + GEOFENCE_TOLERANCE_METERS))?.id ?? null;
 
     myAmbulanceId.current = id;
 
