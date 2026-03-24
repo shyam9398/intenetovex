@@ -23,7 +23,17 @@ const AdminDashboard: React.FC = () => {
     addHospital, removeHospital,
     spawnSimulatedAmbulance,
     refreshMapData,
+    adminCity,
   } = useAppState();
+
+  // Center map on admin's city on first load
+  const adminCityCenter = React.useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem("admin_initial_position");
+      if (raw) return JSON.parse(raw) as LatLng;
+    } catch {}
+    return { lat: 12.9716, lng: 77.5946 };
+  }, []);
 
   const [addMode, setAddMode] = useState<AddMode>(null);
   const [newName, setNewName] = useState("");
