@@ -148,8 +148,8 @@ const AdminDashboard: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
-          <button onClick={handleRefresh} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh">
-            <RefreshCw className="w-4 h-4" />
+          <button onClick={handleRefresh} disabled={refreshing} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh Map Data">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
           <button onClick={logout} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <LogOut className="w-4 h-4" />
