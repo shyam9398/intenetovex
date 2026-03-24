@@ -462,6 +462,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         dismissAlert,
         recommendedHospital,
         refreshMapData,
+        adminCity,
       }}
     >
       {children}
