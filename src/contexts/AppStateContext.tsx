@@ -71,6 +71,7 @@ interface AppStateContextType {
   addAlert: (message: string, type: Alert["type"], ambulanceId?: string) => void;
   dismissAlert: (id: string) => void;
   recommendedHospital: (ambulanceId: string) => Hospital | null;
+  refreshMapData: () => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateContextType | null>(null);
@@ -302,6 +303,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await supabase.from("ambulances").update({ exit_direction: dir }).eq("id", id);
   }, []);
 
+  const refreshMapData = useCallback(async () => {
+    await Promise.all([loadJunctions(), loadGeofences(), loadHospitals(), loadAmbulances()]);
+  }, [loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
+
   const recommendedHospital = useCallback((ambulanceId: string): Hospital | null => {
     const amb = ambulances.find((a) => a.id === ambulanceId);
     if (!amb || hospitals.length === 0) return null;
@@ -440,6 +445,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addAlert,
         dismissAlert,
         recommendedHospital,
+        refreshMapData,
       }}
     >
       {children}

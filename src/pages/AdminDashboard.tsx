@@ -22,6 +22,7 @@ const AdminDashboard: React.FC = () => {
     addGeofence, removeGeofence, updateGeofenceRadius,
     addHospital, removeHospital,
     spawnSimulatedAmbulance,
+    refreshMapData,
   } = useAppState();
 
   const [addMode, setAddMode] = useState<AddMode>(null);
@@ -83,7 +84,12 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleRefresh = () => window.location.reload();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshMapData();
+    setRefreshing(false);
+  };
 
   const selectedJunction = junctions.find((j) => j.id === selectedJunctionId);
   const activeAmbulances = ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority);
@@ -142,8 +148,8 @@ const AdminDashboard: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
-          <button onClick={handleRefresh} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh">
-            <RefreshCw className="w-4 h-4" />
+          <button onClick={handleRefresh} disabled={refreshing} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh Map Data">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
           <button onClick={logout} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors">
             <LogOut className="w-4 h-4" />
