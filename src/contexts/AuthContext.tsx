@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUserProfile = useCallback(async (supaUser: User) => {
     try {
       const [profileRes, rolesRes] = await withTimeout(Promise.all([
-        supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
+        supabase.from("profiles").select("name, city").eq("user_id", supaUser.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", supaUser.id),
       ]), 15000);
 
@@ -70,8 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const name = role === "driver"
         ? (phoneIdentity ?? profileRes.data?.name ?? "Driver")
         : (profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User");
+      const city = (profileRes.data as any)?.city ?? undefined;
 
-      setUser({ id: supaUser.id, name, email: supaUser.email, role });
+      setUser({ id: supaUser.id, name, email: supaUser.email, role, city });
     } catch (err) {
       console.error("Failed to load user profile:", err);
       const fallbackName = phoneFromDriverEmail(supaUser.email) ?? supaUser.email?.split("@")[0] ?? "User";
