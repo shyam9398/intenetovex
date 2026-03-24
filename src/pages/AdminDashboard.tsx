@@ -84,7 +84,12 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleRefresh = () => window.location.reload();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshMapData();
+    setRefreshing(false);
+  };
 
   const selectedJunction = junctions.find((j) => j.id === selectedJunctionId);
   const activeAmbulances = ambulances.filter((a) => a.active).sort((a, b) => a.priority - b.priority);
