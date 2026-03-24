@@ -78,6 +78,7 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [adminCity, setAdminCity] = useState("");
 
   const normalizePhone = (p: string) => p.replace(/[^0-9]/g, "");
   const phoneToEmail = (p: string) => `${normalizePhone(p)}@ambulance.local`;
