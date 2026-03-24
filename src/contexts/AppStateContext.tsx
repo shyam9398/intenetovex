@@ -350,7 +350,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           let insideId: string | null = null;
           for (const gf of geofences) {
             const dist = haversineDistance(amb.position, gf.center);
-            if (dist <= gf.radius) {
+            if (dist <= gf.radius + GEOFENCE_TOLERANCE_METERS) {
               insideId = gf.id;
               const key = `${amb.id}-${gf.id}`;
               if (!alertedRef.current.has(key)) {
