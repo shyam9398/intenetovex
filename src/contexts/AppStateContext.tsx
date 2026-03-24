@@ -106,8 +106,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const alertedRef = useRef<Set<string>>(new Set());
   const myAmbulanceId = useRef<string | null>(null);
 
+  const adminCity = user?.role === "admin" ? (user.city ?? null) : null;
+
   const loadJunctions = useCallback(async () => {
-    const { data } = await supabase.from("junctions").select("*").order("name");
+    let query = supabase.from("junctions").select("*").order("name");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setJunctions(data.map((j) => ({
         id: j.id,
@@ -116,10 +120,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         signalStatus: j.signal_status as "red" | "green",
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadGeofences = useCallback(async () => {
-    const { data } = await supabase.from("geofences").select("*");
+    let query = supabase.from("geofences").select("*");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setGeofences(data.map((g) => ({
         id: g.id,
@@ -129,10 +135,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         triggered: g.triggered,
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadHospitals = useCallback(async () => {
-    const { data } = await supabase.from("hospitals").select("*");
+    let query = supabase.from("hospitals").select("*");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setHospitals(data.map((h) => ({
         id: h.id,
@@ -140,7 +148,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         name: h.name,
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadAmbulances = useCallback(async () => {
     const { data } = await supabase.from("ambulances").select("*").eq("active", true);
