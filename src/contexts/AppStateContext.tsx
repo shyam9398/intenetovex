@@ -303,6 +303,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     await supabase.from("ambulances").update({ exit_direction: dir }).eq("id", id);
   }, []);
 
+  const refreshMapData = useCallback(async () => {
+    await Promise.all([loadJunctions(), loadGeofences(), loadHospitals(), loadAmbulances()]);
+  }, [loadJunctions, loadGeofences, loadHospitals, loadAmbulances]);
+
   const recommendedHospital = useCallback((ambulanceId: string): Hospital | null => {
     const amb = ambulances.find((a) => a.id === ambulanceId);
     if (!amb || hospitals.length === 0) return null;
