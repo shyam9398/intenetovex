@@ -453,6 +453,7 @@ const AdminDashboard: React.FC = () => {
                 onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
                 onJunctionClick={(id) => setSelectedJunctionId(id)}
                 showAmbulances
+                center={adminCityCenter}
                 searchQuery={searchQuery}
                 flyToCenter={flyToCenter}
               />
