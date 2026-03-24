@@ -194,16 +194,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const addJunction = useCallback(async (position: LatLng, name: string) => {
-    await supabase.from("junctions").insert({ name, lat: position.lat, lng: position.lng });
-  }, []);
+    const insertData: any = { name, lat: position.lat, lng: position.lng };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("junctions").insert(insertData);
+  }, [adminCity]);
 
   const removeJunction = useCallback(async (id: string) => {
     await supabase.from("junctions").delete().eq("id", id);
   }, []);
 
   const addGeofence = useCallback(async (center: LatLng, radius: number, name: string) => {
-    await supabase.from("geofences").insert({ name, center_lat: center.lat, center_lng: center.lng, radius });
-  }, []);
+    const insertData: any = { name, center_lat: center.lat, center_lng: center.lng, radius };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("geofences").insert(insertData);
+  }, [adminCity]);
 
   const removeGeofence = useCallback(async (id: string) => {
     await supabase.from("geofences").delete().eq("id", id);
