@@ -71,6 +71,7 @@ interface AppStateContextType {
   addAlert: (message: string, type: Alert["type"], ambulanceId?: string) => void;
   dismissAlert: (id: string) => void;
   recommendedHospital: (ambulanceId: string) => Hospital | null;
+  refreshMapData: () => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateContextType | null>(null);
