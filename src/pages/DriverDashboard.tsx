@@ -24,7 +24,15 @@ const DriverDashboard: React.FC = () => {
     setAmbulanceExitDirection,
     recommendedHospital,
     updateAmbulancePosition,
+    refreshMapData,
   } = useAppState();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshMapData();
+    setRefreshing(false);
+  };
 
   const [ambulanceId, setAmbulanceId] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"off" | "tracking" | "error" | "unavailable">("off");
