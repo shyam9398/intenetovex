@@ -92,6 +92,7 @@ export function haversineDistance(a: LatLng, b: LatLng): number {
   const h = sinLat * sinLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
+const GEOFENCE_TOLERANCE_METERS = 15;
 
 const DEFAULT_POSITION: LatLng = { lat: 12.9716, lng: 77.5946 };
 
