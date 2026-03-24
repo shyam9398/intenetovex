@@ -17,7 +17,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string, role: UserRole, name?: string) => Promise<{ error: string | null }>;
-  signup: (email: string, password: string, role: UserRole, name: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, role: UserRole, name: string, city?: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
