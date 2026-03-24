@@ -127,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadUserProfile]);
 
   const signup = useCallback(async (
-    email: string, password: string, role: UserRole, name: string
+    email: string, password: string, role: UserRole, name: string, city?: string
   ): Promise<{ error: string | null }> => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
@@ -135,8 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userId = data.user.id;
 
+    const profileData: { user_id: string; name: string; city?: string } = { user_id: userId, name };
+    if (city) profileData.city = city;
+
     const [profileError, roleError] = await Promise.all([
-      supabase.from("profiles").insert({ user_id: userId, name }).then(r => r.error),
+      supabase.from("profiles").insert(profileData).then(r => r.error),
       supabase.from("user_roles").insert({ user_id: userId, role }).then(r => r.error),
     ]);
 
