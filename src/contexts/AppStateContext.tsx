@@ -72,6 +72,7 @@ interface AppStateContextType {
   dismissAlert: (id: string) => void;
   recommendedHospital: (ambulanceId: string) => Hospital | null;
   refreshMapData: () => Promise<void>;
+  adminCity: string | null;
 }
 
 const AppStateContext = createContext<AppStateContextType | null>(null);
@@ -91,6 +92,7 @@ export function haversineDistance(a: LatLng, b: LatLng): number {
   const h = sinLat * sinLat + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * sinLng * sinLng;
   return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
+const GEOFENCE_TOLERANCE_METERS = 15;
 
 const DEFAULT_POSITION: LatLng = { lat: 12.9716, lng: 77.5946 };
 
@@ -104,8 +106,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const alertedRef = useRef<Set<string>>(new Set());
   const myAmbulanceId = useRef<string | null>(null);
 
+  const adminCity = user?.role === "admin" ? (user.city ?? null) : null;
+
   const loadJunctions = useCallback(async () => {
-    const { data } = await supabase.from("junctions").select("*").order("name");
+    let query = supabase.from("junctions").select("*").order("name");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setJunctions(data.map((j) => ({
         id: j.id,
@@ -114,10 +120,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         signalStatus: j.signal_status as "red" | "green",
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadGeofences = useCallback(async () => {
-    const { data } = await supabase.from("geofences").select("*");
+    let query = supabase.from("geofences").select("*");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setGeofences(data.map((g) => ({
         id: g.id,
@@ -127,10 +135,12 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         triggered: g.triggered,
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadHospitals = useCallback(async () => {
-    const { data } = await supabase.from("hospitals").select("*");
+    let query = supabase.from("hospitals").select("*");
+    if (adminCity) query = query.eq("city", adminCity);
+    const { data } = await query;
     if (data) {
       setHospitals(data.map((h) => ({
         id: h.id,
@@ -138,7 +148,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         name: h.name,
       })));
     }
-  }, []);
+  }, [adminCity]);
 
   const loadAmbulances = useCallback(async () => {
     const { data } = await supabase.from("ambulances").select("*").eq("active", true);
@@ -184,16 +194,20 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const addJunction = useCallback(async (position: LatLng, name: string) => {
-    await supabase.from("junctions").insert({ name, lat: position.lat, lng: position.lng });
-  }, []);
+    const insertData: any = { name, lat: position.lat, lng: position.lng };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("junctions").insert(insertData);
+  }, [adminCity]);
 
   const removeJunction = useCallback(async (id: string) => {
     await supabase.from("junctions").delete().eq("id", id);
   }, []);
 
   const addGeofence = useCallback(async (center: LatLng, radius: number, name: string) => {
-    await supabase.from("geofences").insert({ name, center_lat: center.lat, center_lng: center.lng, radius });
-  }, []);
+    const insertData: any = { name, center_lat: center.lat, center_lng: center.lng, radius };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("geofences").insert(insertData);
+  }, [adminCity]);
 
   const removeGeofence = useCallback(async (id: string) => {
     await supabase.from("geofences").delete().eq("id", id);
@@ -205,8 +219,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const addHospital = useCallback(async (position: LatLng, name: string) => {
-    await supabase.from("hospitals").insert({ name, lat: position.lat, lng: position.lng });
-  }, []);
+    const insertData: any = { name, lat: position.lat, lng: position.lng };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("hospitals").insert(insertData);
+  }, [adminCity]);
 
   const removeHospital = useCallback(async (id: string) => {
     await supabase.from("hospitals").delete().eq("id", id);
@@ -270,7 +286,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user, addAlert]);
 
   const updateAmbulancePosition = useCallback((id: string, position: LatLng, heading: number, speed = 0) => {
-    const insideGeofenceId = geofences.find((gf) => haversineDistance(position, gf.center) <= gf.radius)?.id ?? null;
+    const insideGeofenceId = geofences.find((gf) => haversineDistance(position, gf.center) <= (gf.radius + GEOFENCE_TOLERANCE_METERS))?.id ?? null;
 
     myAmbulanceId.current = id;
 
@@ -334,7 +350,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           let insideId: string | null = null;
           for (const gf of geofences) {
             const dist = haversineDistance(amb.position, gf.center);
-            if (dist <= gf.radius) {
+            if (dist <= gf.radius + GEOFENCE_TOLERANCE_METERS) {
               insideId = gf.id;
               const key = `${amb.id}-${gf.id}`;
               if (!alertedRef.current.has(key)) {
@@ -446,6 +462,7 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         dismissAlert,
         recommendedHospital,
         refreshMapData,
+        adminCity,
       }}
     >
       {children}

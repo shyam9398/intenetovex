@@ -69,6 +69,7 @@ export type Database = {
         Row: {
           center_lat: number
           center_lng: number
+          city: string | null
           created_at: string
           id: string
           name: string
@@ -78,6 +79,7 @@ export type Database = {
         Insert: {
           center_lat: number
           center_lng: number
+          city?: string | null
           created_at?: string
           id?: string
           name: string
@@ -87,6 +89,7 @@ export type Database = {
         Update: {
           center_lat?: number
           center_lng?: number
+          city?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -97,6 +100,7 @@ export type Database = {
       }
       hospitals: {
         Row: {
+          city: string | null
           created_at: string
           id: string
           lat: number
@@ -104,6 +108,7 @@ export type Database = {
           name: string
         }
         Insert: {
+          city?: string | null
           created_at?: string
           id?: string
           lat: number
@@ -111,6 +116,7 @@ export type Database = {
           name: string
         }
         Update: {
+          city?: string | null
           created_at?: string
           id?: string
           lat?: number
@@ -121,6 +127,7 @@ export type Database = {
       }
       junctions: {
         Row: {
+          city: string | null
           created_at: string
           id: string
           lat: number
@@ -129,6 +136,7 @@ export type Database = {
           signal_status: string
         }
         Insert: {
+          city?: string | null
           created_at?: string
           id?: string
           lat: number
@@ -137,6 +145,7 @@ export type Database = {
           signal_status?: string
         }
         Update: {
+          city?: string | null
           created_at?: string
           id?: string
           lat?: number
@@ -148,18 +157,21 @@ export type Database = {
       }
       profiles: {
         Row: {
+          city: string | null
           created_at: string
           id: string
           name: string
           user_id: string
         }
         Insert: {
+          city?: string | null
           created_at?: string
           id?: string
           name: string
           user_id: string
         }
         Update: {
+          city?: string | null
           created_at?: string
           id?: string
           name?: string

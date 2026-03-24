@@ -198,7 +198,7 @@ const DriverDashboard: React.FC = () => {
 
     let inside = false;
     for (const gf of geofences) {
-      if (haversineDistance(myAmbulance.position, gf.center) <= gf.radius) {
+      if (haversineDistance(myAmbulance.position, gf.center) <= gf.radius + 15) {
         inside = true;
         break;
       }

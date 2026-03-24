@@ -78,6 +78,7 @@ const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [adminName, setAdminName] = useState("");
+  const [adminCity, setAdminCity] = useState("");
 
   const normalizePhone = (p: string) => p.replace(/[^0-9]/g, "");
   const phoneToEmail = (p: string) => `${normalizePhone(p)}@ambulance.local`;
@@ -166,9 +167,18 @@ const LoginPage: React.FC = () => {
       setError("Name is required");
       return;
     }
+    if (mode === "signup" && !adminCity.trim()) {
+      setError("City name is required for admin signup");
+      return;
+    }
     setLoading(true);
     if (mode === "signup") {
-      const { error } = await signup(email, password, "admin", adminName.trim());
+      const coords = await geocodeCity(adminCity.trim());
+      if (coords) {
+        sessionStorage.setItem("admin_initial_position", JSON.stringify(coords));
+        sessionStorage.setItem("admin_city", adminCity.trim().toLowerCase());
+      }
+      const { error } = await signup(email, password, "admin", adminName.trim(), adminCity.trim().toLowerCase());
       if (error) setError(error);
     } else {
       const { error } = await login(email, password, "admin");
@@ -241,19 +251,32 @@ const LoginPage: React.FC = () => {
 
           {/* ── ADMIN: Email/Password Form ── */}
           {!isDriver && (
-            <form onSubmit={handleAdminSubmit} className="space-y-4">
+          <form onSubmit={handleAdminSubmit} className="space-y-4">
               {mode === "signup" && (
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <input
-                      type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)}
-                      placeholder="Admin name"
-                      className="w-full pl-10 pr-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-                    />
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Name</label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)}
+                        placeholder="Admin name"
+                        className="w-full pl-10 pr-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      />
+                    </div>
                   </div>
-                </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">City</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text" value={adminCity} onChange={(e) => setAdminCity(e.target.value)}
+                        placeholder="e.g. Bangalore, Mumbai, Delhi"
+                        className="w-full pl-10 pr-3 py-2.5 bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Email</label>

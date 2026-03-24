@@ -9,6 +9,7 @@ interface AuthUser {
   name: string;
   email?: string;
   role: UserRole;
+  city?: string;
 }
 
 interface AuthContextType {
@@ -16,7 +17,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string, role: UserRole, name?: string) => Promise<{ error: string | null }>;
-  signup: (email: string, password: string, role: UserRole, name: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, role: UserRole, name: string, city?: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
 }
 
@@ -52,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const loadUserProfile = useCallback(async (supaUser: User) => {
     try {
       const [profileRes, rolesRes] = await withTimeout(Promise.all([
-        supabase.from("profiles").select("name").eq("user_id", supaUser.id).maybeSingle(),
+        supabase.from("profiles").select("name, city").eq("user_id", supaUser.id).maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", supaUser.id),
       ]), 15000);
 
@@ -69,8 +70,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const name = role === "driver"
         ? (phoneIdentity ?? profileRes.data?.name ?? "Driver")
         : (profileRes.data?.name ?? supaUser.email?.split("@")[0] ?? "User");
+      const city = (profileRes.data as any)?.city ?? undefined;
 
-      setUser({ id: supaUser.id, name, email: supaUser.email, role });
+      setUser({ id: supaUser.id, name, email: supaUser.email, role, city });
     } catch (err) {
       console.error("Failed to load user profile:", err);
       const fallbackName = phoneFromDriverEmail(supaUser.email) ?? supaUser.email?.split("@")[0] ?? "User";
@@ -125,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadUserProfile]);
 
   const signup = useCallback(async (
-    email: string, password: string, role: UserRole, name: string
+    email: string, password: string, role: UserRole, name: string, city?: string
   ): Promise<{ error: string | null }> => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
@@ -133,8 +135,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const userId = data.user.id;
 
+    const profileData: { user_id: string; name: string; city?: string } = { user_id: userId, name };
+    if (city) profileData.city = city;
+
     const [profileError, roleError] = await Promise.all([
-      supabase.from("profiles").insert({ user_id: userId, name }).then(r => r.error),
+      supabase.from("profiles").insert(profileData).then(r => r.error),
       supabase.from("user_roles").insert({ user_id: userId, role }).then(r => r.error),
     ]);
 

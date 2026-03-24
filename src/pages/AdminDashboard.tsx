@@ -23,7 +23,17 @@ const AdminDashboard: React.FC = () => {
     addHospital, removeHospital,
     spawnSimulatedAmbulance,
     refreshMapData,
+    adminCity,
   } = useAppState();
+
+  // Center map on admin's city on first load
+  const adminCityCenter = React.useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem("admin_initial_position");
+      if (raw) return JSON.parse(raw) as LatLng;
+    } catch {}
+    return { lat: 12.9716, lng: 77.5946 };
+  }, []);
 
   const [addMode, setAddMode] = useState<AddMode>(null);
   const [newName, setNewName] = useState("");
@@ -147,7 +157,9 @@ const AdminDashboard: React.FC = () => {
           <span className="text-sm font-bold text-foreground">Admin</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:block">{user?.name}</span>
+          <span className="text-xs text-muted-foreground hidden sm:block">
+            {user?.name}{adminCity ? ` • ${adminCity}` : ""}
+          </span>
           <button onClick={handleRefresh} disabled={refreshing} className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors" title="Refresh Map Data">
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
@@ -443,6 +455,7 @@ const AdminDashboard: React.FC = () => {
                 onMapClick={addMode && addMode !== "geofence" ? handleMapClick : undefined}
                 onJunctionClick={(id) => setSelectedJunctionId(id)}
                 showAmbulances
+                center={adminCityCenter}
                 searchQuery={searchQuery}
                 flyToCenter={flyToCenter}
               />
