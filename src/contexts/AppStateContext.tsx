@@ -219,8 +219,10 @@ export const AppStateProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const addHospital = useCallback(async (position: LatLng, name: string) => {
-    await supabase.from("hospitals").insert({ name, lat: position.lat, lng: position.lng });
-  }, []);
+    const insertData: any = { name, lat: position.lat, lng: position.lng };
+    if (adminCity) insertData.city = adminCity;
+    await supabase.from("hospitals").insert(insertData);
+  }, [adminCity]);
 
   const removeHospital = useCallback(async (id: string) => {
     await supabase.from("hospitals").delete().eq("id", id);
