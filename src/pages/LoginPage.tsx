@@ -167,9 +167,18 @@ const LoginPage: React.FC = () => {
       setError("Name is required");
       return;
     }
+    if (mode === "signup" && !adminCity.trim()) {
+      setError("City name is required for admin signup");
+      return;
+    }
     setLoading(true);
     if (mode === "signup") {
-      const { error } = await signup(email, password, "admin", adminName.trim());
+      const coords = await geocodeCity(adminCity.trim());
+      if (coords) {
+        sessionStorage.setItem("admin_initial_position", JSON.stringify(coords));
+        sessionStorage.setItem("admin_city", adminCity.trim().toLowerCase());
+      }
+      const { error } = await signup(email, password, "admin", adminName.trim(), adminCity.trim().toLowerCase());
       if (error) setError(error);
     } else {
       const { error } = await login(email, password, "admin");
